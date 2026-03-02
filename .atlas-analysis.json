@@ -1,0 +1,196 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "OpenInference",
+  "projectDescription": "OpenTelemetry-based semantic conventions and instrumentation for AI application observability",
+  "theme": "aspen",
+  "primaryColor": "#FF6F00",
+  "lightColor": "#FFA726",
+  "darkColor": "#E65100",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/overview",
+              "concepts/traces",
+              "concepts/spans",
+              "concepts/span-kinds",
+              "concepts/attributes"
+            ]
+          },
+          {
+            "group": "Python",
+            "pages": [
+              "python/installation",
+              "python/semantic-conventions",
+              "python/instrumentation-core",
+              "python/instrumentations"
+            ]
+          },
+          {
+            "group": "JavaScript",
+            "pages": [
+              "javascript/installation",
+              "javascript/semantic-conventions",
+              "javascript/core",
+              "javascript/instrumentations"
+            ]
+          },
+          {
+            "group": "Java",
+            "pages": [
+              "java/installation",
+              "java/semantic-conventions",
+              "java/instrumentation",
+              "java/instrumentations"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/trace-config",
+              "configuration/environment-variables",
+              "configuration/privacy-controls"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Specification",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "spec/introduction",
+              "spec/data-model"
+            ]
+          },
+          {
+            "group": "Core Specifications",
+            "pages": [
+              "spec/semantic-conventions",
+              "spec/traces-spec",
+              "spec/configuration-spec"
+            ]
+          },
+          {
+            "group": "Span Types",
+            "pages": [
+              "spec/llm-spans",
+              "spec/embedding-spans",
+              "spec/tool-calling",
+              "spec/multimodal-attributes"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Instrumentations",
+        "groups": [
+          {
+            "group": "Python Instrumentations",
+            "pages": [
+              "instrumentations/python/openai",
+              "instrumentations/python/langchain",
+              "instrumentations/python/llama-index",
+              "instrumentations/python/anthropic",
+              "instrumentations/python/bedrock",
+              "instrumentations/python/dspy",
+              "instrumentations/python/haystack",
+              "instrumentations/python/vertexai",
+              "instrumentations/python/mistralai",
+              "instrumentations/python/all-python"
+            ]
+          },
+          {
+            "group": "JavaScript Instrumentations",
+            "pages": [
+              "instrumentations/javascript/openai",
+              "instrumentations/javascript/langchain",
+              "instrumentations/javascript/anthropic",
+              "instrumentations/javascript/bedrock",
+              "instrumentations/javascript/vercel",
+              "instrumentations/javascript/all-javascript"
+            ]
+          },
+          {
+            "group": "Java Instrumentations",
+            "pages": [
+              "instrumentations/java/langchain4j",
+              "instrumentations/java/spring-ai",
+              "instrumentations/java/all-java"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Python Examples",
+            "pages": [
+              "examples/python/openai-chat",
+              "examples/python/langchain-rag",
+              "examples/python/llama-index-query",
+              "examples/python/dspy-rag"
+            ]
+          },
+          {
+            "group": "JavaScript Examples",
+            "pages": [
+              "examples/javascript/openai-basic",
+              "examples/javascript/langchain-express",
+              "examples/javascript/nextjs-openai"
+            ]
+          },
+          {
+            "group": "Java Examples",
+            "pages": [
+              "examples/java/langchain4j-example",
+              "examples/java/spring-ai-example"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "OpenTelemetry-compatible semantic conventions for AI observability",
+    "Multi-language support (Python, JavaScript, Java)",
+    "30+ instrumentation libraries for popular AI frameworks",
+    "Automatic tracing for LLMs, agents, tools, and retrievers",
+    "Privacy controls and PII masking",
+    "Token counting and cost tracking",
+    "Context propagation for session and user tracking",
+    "Comprehensive span kinds (LLM, Agent, Chain, Tool, Retriever, etc.)",
+    "Support for multimodal content and tool calling"
+  ],
+  "publicApiSurface": [
+    "SpanAttributes - Semantic convention attribute names",
+    "OpenInferenceSpanKindValues - Span kind constants",
+    "OpenAIInstrumentor - Python OpenAI instrumentation",
+    "LangChainInstrumentor - Python LangChain instrumentation",
+    "LlamaIndexInstrumentor - Python LlamaIndex instrumentation",
+    "@arizeai/openinference-instrumentation-openai - JS OpenAI instrumentation",
+    "@arizeai/openinference-instrumentation-langchain - JS LangChain instrumentation",
+    "@arizeai/openinference-semantic-conventions - JS semantic conventions",
+    "OITracer - Core tracer wrapper with privacy controls",
+    "TraceConfig - Privacy and masking configuration",
+    "using_session() - Context manager for session tracking",
+    "using_user() - Context manager for user tracking",
+    "using_metadata() - Context manager for metadata",
+    "using_tags() - Context manager for tags",
+    "com.arize.openinference.instrumentation.langchain4j - Java LangChain4j instrumentation",
+    "com.arize.openinference.instrumentation.springAI - Java Spring AI instrumentation"
+  ]
+}
