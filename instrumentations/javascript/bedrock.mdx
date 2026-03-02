@@ -1,0 +1,92 @@
+---
+title: AWS Bedrock
+description: Auto-instrumentation for AWS Bedrock Runtime JS SDK
+---
+
+This module provides automatic instrumentation for [AWS Bedrock Runtime](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/Package/-aws-sdk-client-bedrock/) which may be used in conjunction with OpenTelemetry.
+
+## Installation
+
+Install the instrumentation package:
+
+<CodeGroup>
+```bash npm
+npm install --save @arizeai/openinference-instrumentation-bedrock
+```
+
+```bash yarn
+yarn add @arizeai/openinference-instrumentation-bedrock
+```
+
+```bash pnpm
+pnpm add @arizeai/openinference-instrumentation-bedrock
+```
+</CodeGroup>
+
+## Usage
+
+To load the Bedrock instrumentation, specify it in the registerInstrumentations call along with any additional instrumentation you wish to enable.
+
+```typescript
+const { NodeTracerProvider } = require("@opentelemetry/sdk-trace-node");
+const { BedrockInstrumentation } = require("@arizeai/openinference-instrumentation-bedrock");
+const { registerInstrumentations } = require("@opentelemetry/instrumentation");
+
+const provider = new NodeTracerProvider();
+provider.register();
+
+registerInstrumentations({
+  instrumentations: [new BedrockInstrumentation()],
+});
+```
+
+## TypeScript Example with Custom Tracer Provider
+
+You can specify a custom tracer provider when creating the Bedrock instrumentation. This is useful when you want to use a non-global tracer provider or have more control over the tracing configuration.
+
+```typescript
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { Resource } from "@opentelemetry/resources";
+import { SEMRESATTRS_PROJECT_NAME } from "@arizeai/openinference-semantic-conventions";
+import { BedrockInstrumentation } from "@arizeai/openinference-instrumentation-bedrock";
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+
+// Create a custom tracer provider
+const customTracerProvider = new NodeTracerProvider({
+  resource: new Resource({
+    [SEMRESATTRS_PROJECT_NAME]: "my-bedrock-project",
+  }),
+});
+
+// Pass the custom tracer provider to the instrumentation
+const bedrockInstrumentation = new BedrockInstrumentation({
+  tracerProvider: customTracerProvider,
+});
+
+// Register the instrumentation with the custom tracer provider
+registerInstrumentations({
+  instrumentations: [bedrockInstrumentation],
+  tracerProvider: customTracerProvider,
+});
+```
+
+Alternatively, you can set the tracer provider after creating the instrumentation:
+
+```typescript
+const bedrockInstrumentation = new BedrockInstrumentation();
+bedrockInstrumentation.setTracerProvider(customTracerProvider);
+```
+
+## Compatibility
+
+`@arizeai/openinference-instrumentation-bedrock` is compatible with the following versions of the `@aws-sdk/client-bedrock-runtime` package:
+
+| AWS SDK Version | OpenInference Instrumentation Version |
+| --------------- | ------------------------------------- |
+| ^3.0.0          | ^0.2.0                                |
+
+## Resources
+
+- [npm package](https://www.npmjs.com/package/@arizeai/openinference-instrumentation-bedrock)
+- [Source code](https://github.com/Arize-ai/openinference/tree/main/js/packages/openinference-instrumentation-bedrock)
+- [OpenTelemetry Node.js SDK documentation](https://opentelemetry.io/docs/instrumentation/js/getting-started/nodejs/)

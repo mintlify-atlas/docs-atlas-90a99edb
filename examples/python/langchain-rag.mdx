@@ -1,0 +1,137 @@
+---
+title: LangChain RAG Pipeline
+description: Build and instrument a retrieval-augmented generation pipeline with LangChain
+---
+
+This example shows how to instrument a LangChain RAG (Retrieval-Augmented Generation) pipeline with OpenInference tracing.
+
+## Prerequisites
+
+- Python 3.9+
+- OpenAI API key
+- Phoenix or another OpenTelemetry collector
+
+## Installation
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    pip install langchain langchain-openai langchain-core \
+      openinference-instrumentation-langchain \
+      opentelemetry-sdk \
+      opentelemetry-exporter-otlp
+    ```
+  </Step>
+
+  <Step title="Set environment variables">
+    ```bash
+    export OPENAI_API_KEY="your-api-key"
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+
+from openinference.instrumentation.langchain import LangChainInstrumentor
+
+# Configure OpenTelemetry
+endpoint = "http://127.0.0.1:6006/v1/traces"
+tracer_provider = trace_sdk.TracerProvider()
+tracer_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter(endpoint)))
+tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+
+# Instrument LangChain
+LangChainInstrumentor().instrument(tracer_provider=tracer_provider)
+
+# Create a prompt template with partial variables
+prompt = ChatPromptTemplate.from_template("{x} {y} {z}?").partial(x="why is", z="blue")
+
+# Create a chain with LangChain Expression Language (LCEL)
+chain = prompt | ChatOpenAI(model_name="gpt-3.5-turbo")
+
+if __name__ == "__main__":
+    # Invoke the chain
+    response = chain.invoke(dict(y="sky"))
+    print(response.content)
+```
+
+## Advanced RAG Example
+
+Here's a more complete RAG pipeline with retrieval:
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain.vectorstores import FAISS
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.documents import Document
+
+# Sample documents
+docs = [
+    Document(page_content="LangChain is a framework for developing applications powered by language models."),
+    Document(page_content="OpenInference provides OpenTelemetry-native instrumentation for LLM applications."),
+    Document(page_content="Phoenix is an open-source observability platform for LLMs."),
+]
+
+# Create vector store
+embeddings = OpenAIEmbeddings()
+vectorstore = FAISS.from_documents(docs, embeddings)
+retriever = vectorstore.as_retriever()
+
+# Create prompt
+system_prompt = (
+    "You are an assistant for question-answering tasks. "
+    "Use the following pieces of retrieved context to answer the question. "
+    "If you don't know the answer, say that you don't know. "
+    "\n\n{context}"
+)
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", system_prompt),
+    ("human", "{input}"),
+])
+
+# Create LLM and chains
+llm = ChatOpenAI(model_name="gpt-3.5-turbo")
+question_answer_chain = create_stuff_documents_chain(llm, prompt)
+rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+
+# Query the RAG chain
+response = rag_chain.invoke({"input": "What is OpenInference?"})
+print(response["answer"])
+```
+
+## Key Features
+
+### Automatic Chain Tracing
+
+LangChain instrumentation automatically traces:
+- **Chains**: All LCEL chains and legacy chain types
+- **Retrievers**: Vector store retrievals and custom retrievers
+- **LLM calls**: Chat models, completion models, and embeddings
+- **Tools**: Function calls and tool executions
+
+### Prompt Template Tracking
+
+The instrumentation captures:
+- Template structure and variables
+- Partial variable substitutions
+- Final rendered prompts
+
+### Integration with LangGraph
+
+The instrumentor also supports LangGraph for agentic workflows with state machines.
+
+## Next Steps
+
+- Explore [DSPy optimization](/examples/python/dspy-rag)
+- Learn about [LlamaIndex queries](/examples/python/llama-index-query)
+- See [agent patterns](/examples/python/langchain-agents)

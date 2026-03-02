@@ -1,0 +1,142 @@
+---
+title: OpenAI
+description: Python auto-instrumentation for OpenAI SDK
+---
+
+Python auto-instrumentation library for OpenAI's Python SDK.
+
+The traces emitted by this instrumentation are fully OpenTelemetry compatible and can be sent to an OpenTelemetry collector for viewing, such as [Arize Phoenix](https://github.com/Arize-ai/phoenix).
+
+## Installation
+
+```bash
+pip install openinference-instrumentation-openai
+```
+
+## Quickstart
+
+This example shows how to instrument a program that uses OpenAI and observe the traces via [Arize Phoenix](https://github.com/Arize-ai/phoenix).
+
+### Install packages
+
+```bash
+pip install openinference-instrumentation-openai "openai>=1.26" arize-phoenix opentelemetry-sdk opentelemetry-exporter-otlp
+```
+
+### Start Phoenix server
+
+The Phoenix server runs entirely on your machine and does not send data over the internet.
+
+```bash
+python -m phoenix.server.main serve
+```
+
+### Setup instrumentation
+
+Configure the `OpenAIInstrumentor` and set up the tracer to send traces to Phoenix:
+
+```python
+import openai
+from openinference.instrumentation.openai import OpenAIInstrumentor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+
+endpoint = "http://127.0.0.1:6006/v1/traces"
+tracer_provider = trace_sdk.TracerProvider()
+tracer_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter(endpoint)))
+# Optionally, you can also print the spans to the console.
+tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+
+
+if __name__ == "__main__":
+    client = openai.OpenAI()
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": "Write a haiku."}],
+        max_tokens=20,
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+    for chunk in response:
+        if chunk.choices and (content := chunk.choices[0].delta.content):
+            print(content, end="")
+```
+
+### Set API key
+
+```bash
+export OPENAI_API_KEY=your-api-key
+```
+
+### Run your application
+
+```bash
+python your_file.py
+```
+
+Visit the Phoenix app at `http://localhost:6006` to see your traces.
+
+## Example with context attributes
+
+```python
+import openai
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+
+from openinference.instrumentation import using_attributes
+from openinference.instrumentation.openai import OpenAIInstrumentor
+
+endpoint = "http://127.0.0.1:6006/v1/traces"
+tracer_provider = trace_sdk.TracerProvider()
+tracer_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter(endpoint)))
+tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+
+
+if __name__ == "__main__":
+    client = openai.OpenAI()
+    with using_attributes(
+        session_id="my-test-session",
+        user_id="my-test-user",
+        metadata={
+            "test-int": 1,
+            "test-str": "string",
+            "test-list": [1, 2, 3],
+            "test-dict": {
+                "key-1": "val-1",
+                "key-2": "val-2",
+            },
+        },
+        tags=["tag-1", "tag-2"],
+        prompt_template="Who won the soccer match in {city} on {date}",
+        prompt_template_version="v1.0",
+        prompt_template_variables={
+            "city": "Johannesburg",
+            "date": "July 11th",
+        },
+    ):
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": "Write a haiku."}],
+            max_tokens=20,
+        )
+        print(response.choices[0].message.content)
+```
+
+## FAQ
+
+**Q: How to get token counts when streaming?**
+
+**A:** To get token counts when streaming, install `openai>=1.26` and set `stream_options={"include_usage": True}` when calling `create`. See the example shown above. For more info, see [OpenAI's announcement](https://community.openai.com/t/usage-stats-now-available-when-using-streaming-with-the-chat-completions-api-or-completions-api/738156).
+
+## More Info
+
+- [OpenInference and Phoenix documentation](https://docs.arize.com/phoenix)
+- [How to customize spans to track sessions, metadata, etc.](https://github.com/Arize-ai/openinference/tree/main/python/openinference-instrumentation#customizing-spans)
+- [How to account for private information and span payload customization](https://github.com/Arize-ai/openinference/tree/main/python/openinference-instrumentation#tracing-configuration)
+- [PyPI package](https://pypi.org/project/openinference-instrumentation-openai/)

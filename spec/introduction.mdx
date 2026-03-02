@@ -1,0 +1,64 @@
+---
+title: "Introduction"
+description: "OpenInference semantic convention specification for AI application observability"
+---
+
+OpenInference is a semantic convention specification for AI application observability, built on [OpenTelemetry](https://opentelemetry.io/). It standardizes how LLM calls, agent reasoning steps, tool invocations, retrieval operations, and other AI-specific workloads are represented as distributed traces.
+
+## Motivation
+
+OpenTelemetry defines a universal wire format and SDK model for distributed tracing, but its attribute model is intentionally generic. AI applications present a distinct set of observability requirements that general-purpose conventions do not address:
+
+### Structured Inputs and Outputs
+
+LLM calls carry multi-turn message arrays, system prompts, tool definitions, and multimodal content; a single string `input.value` is insufficient.
+
+### Token Economics
+
+Prompt and completion token counts, along with cached and reasoning token breakdowns, are first-class operational metrics, not afterthoughts.
+
+### Agentic Control Flow
+
+Modern AI systems route through reasoning loops, delegate to sub-agents, invoke tools, and query retrieval systems. Each hop needs a consistent identity and span-kind taxonomy for the trace to be interpretable.
+
+### Privacy Sensitivity
+
+Prompts and completions frequently contain personal information and must be maskable before export, with per-field granularity.
+
+### Nondeterminism
+
+LLM outputs are stochastic; traces must carry enough context to reproduce — or at least explain — a particular execution.
+
+## Solution
+
+OpenInference solves these problems by defining a concrete attribute schema and span-kind taxonomy on top of OpenTelemetry spans. Every OpenInference trace is a valid OTLP trace; the conventions give attribute names their AI-specific meaning.
+
+## Specifications
+
+### Core
+
+- [Traces](/spec/traces-spec) — Trace structure, span hierarchy, and context propagation
+- [Semantic Conventions](/spec/semantic-conventions) — Complete attribute reference
+- [Configuration](/spec/configuration-spec) — Environment variables, privacy controls, and data masking
+
+### Span Types
+
+- [LLM Spans](/spec/llm-spans) — Attributes for language model calls: messages, token counts, model parameters, and tool definitions
+- [Embedding Spans](/spec/embedding-spans) — Attributes for vector embedding generation
+
+### Attribute Conventions
+
+- [Tool Calling](/spec/tool-calling) — Function/tool call and result representation
+- [Multimodal Attributes](/spec/multimodal-attributes) — Image, audio, and mixed-content messages
+
+## Notation Conventions and Compliance
+
+The keywords "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this specification are to be interpreted as described in [BCP 14](https://tools.ietf.org/html/bcp14) [[RFC2119](https://tools.ietf.org/html/rfc2119)] [[RFC8174](https://tools.ietf.org/html/rfc8174)] when, and only when, they appear in all capitals, as shown here.
+
+<Note>
+An implementation is **compliant** if it satisfies all "MUST", "MUST NOT", "REQUIRED", "SHALL", and "SHALL NOT" requirements defined in this specification. An implementation that fails to satisfy any such requirement is **not compliant**.
+</Note>
+
+## Project Naming
+
+The official project name is "OpenInference" (no space between "Open" and "Inference").

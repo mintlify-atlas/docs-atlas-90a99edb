@@ -1,0 +1,310 @@
+---
+title: "Semantic Conventions"
+description: "OpenInference semantic conventions for JavaScript tracing"
+---
+
+## Overview
+
+The `@arizeai/openinference-semantic-conventions` package provides TypeScript constants for OpenInference tracing attributes. These conventions ensure consistent attribute names across traces.
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm install --save @arizeai/openinference-semantic-conventions
+```
+
+```bash yarn
+yarn add @arizeai/openinference-semantic-conventions
+```
+
+```bash pnpm
+pnpm add @arizeai/openinference-semantic-conventions
+```
+</CodeGroup>
+
+## Package Exports
+
+The package exports constants for trace attributes and resource attributes:
+
+```typescript
+import {
+  // Span kinds
+  OpenInferenceSpanKind,
+  
+  // Input/Output attributes
+  INPUT_VALUE,
+  INPUT_MIME_TYPE,
+  OUTPUT_VALUE,
+  OUTPUT_MIME_TYPE,
+  
+  // LLM attributes
+  LLM_MODEL_NAME,
+  LLM_PROVIDER,
+  LLM_INPUT_MESSAGES,
+  LLM_OUTPUT_MESSAGES,
+  LLM_INVOCATION_PARAMETERS,
+  LLM_TOKEN_COUNT_PROMPT,
+  LLM_TOKEN_COUNT_COMPLETION,
+  LLM_TOKEN_COUNT_TOTAL,
+  
+  // Context attributes
+  SESSION_ID,
+  USER_ID,
+  METADATA,
+  TAG_TAGS,
+  
+  // Resource attributes
+  SEMRESATTRS_PROJECT_NAME,
+  
+  // MIME types
+  MimeType,
+  
+  // Semantic conventions
+  SemanticConventions,
+} from "@arizeai/openinference-semantic-conventions";
+```
+
+## Span Kinds
+
+OpenInference defines semantic span kinds for AI/LLM operations:
+
+```typescript
+enum OpenInferenceSpanKind {
+  CHAIN = "CHAIN",
+  LLM = "LLM",
+  RETRIEVER = "RETRIEVER",
+  RERANKER = "RERANKER",
+  EMBEDDING = "EMBEDDING",
+  TOOL = "TOOL",
+  AGENT = "AGENT",
+  EVALUATOR = "EVALUATOR",
+}
+```
+
+### Usage Example
+
+```typescript
+import { trace } from "@opentelemetry/api";
+import { OpenInferenceSpanKind } from "@arizeai/openinference-semantic-conventions";
+
+const tracer = trace.getTracer("my-service");
+
+const span = tracer.startSpan("llm-call", {
+  attributes: {
+    ["openinference.span.kind"]: OpenInferenceSpanKind.LLM,
+  },
+});
+```
+
+## Input/Output Attributes
+
+Standard attributes for span inputs and outputs:
+
+```typescript
+import {
+  INPUT_VALUE,
+  INPUT_MIME_TYPE,
+  OUTPUT_VALUE,
+  OUTPUT_MIME_TYPE,
+  MimeType,
+} from "@arizeai/openinference-semantic-conventions";
+
+span.setAttributes({
+  [INPUT_VALUE]: "What is OpenInference?",
+  [INPUT_MIME_TYPE]: MimeType.TEXT,
+  [OUTPUT_VALUE]: "OpenInference is a framework...",
+  [OUTPUT_MIME_TYPE]: MimeType.TEXT,
+});
+```
+
+### Available MIME Types
+
+```typescript
+enum MimeType {
+  TEXT = "text/plain",
+  JSON = "application/json",
+}
+```
+
+## LLM Attributes
+
+Attributes specific to LLM operations:
+
+```typescript
+import {
+  LLM_MODEL_NAME,
+  LLM_PROVIDER,
+  LLM_INPUT_MESSAGES,
+  LLM_OUTPUT_MESSAGES,
+  LLM_INVOCATION_PARAMETERS,
+  LLM_TOKEN_COUNT_PROMPT,
+  LLM_TOKEN_COUNT_COMPLETION,
+  LLM_TOKEN_COUNT_TOTAL,
+} from "@arizeai/openinference-semantic-conventions";
+
+span.setAttributes({
+  [LLM_MODEL_NAME]: "gpt-4o-mini",
+  [LLM_PROVIDER]: "openai",
+  [LLM_TOKEN_COUNT_PROMPT]: 12,
+  [LLM_TOKEN_COUNT_COMPLETION]: 44,
+  [LLM_TOKEN_COUNT_TOTAL]: 56,
+  [LLM_INVOCATION_PARAMETERS]: JSON.stringify({ temperature: 0.7 }),
+});
+```
+
+### Message Attributes
+
+For chat completions with message arrays:
+
+```typescript
+import {
+  LLM_INPUT_MESSAGES,
+  LLM_OUTPUT_MESSAGES,
+  SemanticConventions,
+} from "@arizeai/openinference-semantic-conventions";
+
+const inputMessages = [
+  { role: "user", content: "What is OpenInference?" },
+];
+
+span.setAttribute(
+  `${LLM_INPUT_MESSAGES}.0.${SemanticConventions.MESSAGE_ROLE}`,
+  "user"
+);
+span.setAttribute(
+  `${LLM_INPUT_MESSAGES}.0.${SemanticConventions.MESSAGE_CONTENT}`,
+  "What is OpenInference?"
+);
+```
+
+## Retrieval Attributes
+
+For document retrieval operations:
+
+```typescript
+import { SemanticConventions } from "@arizeai/openinference-semantic-conventions";
+
+span.setAttribute(
+  `${SemanticConventions.RETRIEVAL_DOCUMENTS}.0.${SemanticConventions.DOCUMENT_ID}`,
+  "doc-123"
+);
+span.setAttribute(
+  `${SemanticConventions.RETRIEVAL_DOCUMENTS}.0.${SemanticConventions.DOCUMENT_CONTENT}`,
+  "Document content..."
+);
+span.setAttribute(
+  `${SemanticConventions.RETRIEVAL_DOCUMENTS}.0.${SemanticConventions.DOCUMENT_SCORE}`,
+  0.95
+);
+```
+
+## Embedding Attributes
+
+For embedding operations:
+
+```typescript
+import { SemanticConventions } from "@arizeai/openinference-semantic-conventions";
+
+span.setAttribute(
+  SemanticConventions.EMBEDDING_MODEL_NAME,
+  "text-embedding-3-small"
+);
+span.setAttribute(
+  `${SemanticConventions.EMBEDDING_EMBEDDINGS}.0.${SemanticConventions.EMBEDDING_TEXT}`,
+  "Text to embed"
+);
+```
+
+## Tool Attributes
+
+For function/tool calling:
+
+```typescript
+import { SemanticConventions } from "@arizeai/openinference-semantic-conventions";
+
+span.setAttribute(
+  `${SemanticConventions.TOOL_CALL}.0.${SemanticConventions.TOOL_NAME}`,
+  "get_weather"
+);
+span.setAttribute(
+  `${SemanticConventions.TOOL_CALL}.0.${SemanticConventions.TOOL_PARAMETERS}`,
+  JSON.stringify({ city: "Seattle" })
+);
+```
+
+## Context Attributes
+
+For session and user tracking:
+
+```typescript
+import {
+  SESSION_ID,
+  USER_ID,
+  METADATA,
+  TAG_TAGS,
+} from "@arizeai/openinference-semantic-conventions";
+
+span.setAttributes({
+  [SESSION_ID]: "session-123",
+  [USER_ID]: "user-456",
+  [METADATA]: JSON.stringify({ tenant: "acme" }),
+  [TAG_TAGS]: JSON.stringify(["production", "api"]),
+});
+```
+
+## Resource Attributes
+
+For identifying the project:
+
+```typescript
+import { Resource } from "@opentelemetry/resources";
+import { SEMRESATTRS_PROJECT_NAME } from "@arizeai/openinference-semantic-conventions";
+
+const resource = new Resource({
+  [SEMRESATTRS_PROJECT_NAME]: "my-ai-app",
+});
+```
+
+## Semantic Conventions Object
+
+The `SemanticConventions` export provides all attribute keys:
+
+```typescript
+import { SemanticConventions } from "@arizeai/openinference-semantic-conventions";
+
+// Access any attribute key
+SemanticConventions.LLM_MODEL_NAME      // "llm.model_name"
+SemanticConventions.INPUT_VALUE         // "input.value"
+SemanticConventions.OUTPUT_VALUE        // "output.value"
+SemanticConventions.SESSION_ID          // "session.id"
+SemanticConventions.USER_ID             // "user.id"
+SemanticConventions.METADATA            // "metadata"
+SemanticConventions.MESSAGE_ROLE        // "message.role"
+SemanticConventions.MESSAGE_CONTENT     // "message.content"
+SemanticConventions.DOCUMENT_ID         // "document.id"
+SemanticConventions.DOCUMENT_CONTENT    // "document.content"
+SemanticConventions.TOOL_NAME           // "tool.name"
+SemanticConventions.TOOL_PARAMETERS     // "tool.parameters"
+```
+
+## Best Practices
+
+<Tip>
+**Use the core package helpers** instead of setting attributes manually. The `@arizeai/openinference-core` package provides helper functions like `getLLMAttributes()` and `getRetrieverAttributes()` that handle attribute naming automatically.
+</Tip>
+
+<Warning>
+Always use the exported constants rather than hardcoding attribute names. This ensures compatibility with future versions and prevents typos.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Core Package" icon="cube" href="/javascript/core">
+    Use attribute helpers from openinference-core
+  </Card>
+  <Card title="Instrumentations" icon="plug" href="/javascript/instrumentations">
+    Auto-instrument your LLM frameworks
+  </Card>
+</CardGroup>

@@ -1,122 +1,181 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "OpenInference",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#FF6F00",
+    "light": "#FFA726",
+    "dark": "#E65100"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/Arize-ai/openinference"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Arize-ai/openinference",
+      "slack": "https://join.slack.com/t/arize-ai/shared_invite/zt-3lqwr2oc3-7rhdyYEh82zJL_UhPKrb0A",
+      "x": "https://twitter.com/ArizePhoenix"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/overview",
+              "concepts/traces",
+              "concepts/spans",
+              "concepts/span-kinds",
+              "concepts/attributes"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Python",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "python/installation",
+              "python/semantic-conventions",
+              "python/instrumentation-core",
+              "python/instrumentations"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "JavaScript",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "javascript/installation",
+              "javascript/semantic-conventions",
+              "javascript/core",
+              "javascript/instrumentations"
+            ]
+          },
+          {
+            "group": "Java",
+            "pages": [
+              "java/installation",
+              "java/semantic-conventions",
+              "java/instrumentation",
+              "java/instrumentations"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/trace-config",
+              "configuration/environment-variables",
+              "configuration/privacy-controls"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Specification",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Overview",
             "pages": [
-              "api-reference/introduction"
+              "spec/introduction",
+              "spec/data-model"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Core Specifications",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "spec/semantic-conventions",
+              "spec/traces-spec",
+              "spec/configuration-spec"
+            ]
+          },
+          {
+            "group": "Span Types",
+            "pages": [
+              "spec/llm-spans",
+              "spec/embedding-spans",
+              "spec/tool-calling",
+              "spec/multimodal-attributes"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Instrumentations",
+        "groups": [
+          {
+            "group": "Python Instrumentations",
+            "pages": [
+              "instrumentations/python/openai",
+              "instrumentations/python/langchain",
+              "instrumentations/python/llama-index",
+              "instrumentations/python/anthropic",
+              "instrumentations/python/bedrock",
+              "instrumentations/python/dspy",
+              "instrumentations/python/haystack",
+              "instrumentations/python/vertexai",
+              "instrumentations/python/mistralai",
+              "instrumentations/python/all-python"
+            ]
+          },
+          {
+            "group": "JavaScript Instrumentations",
+            "pages": [
+              "instrumentations/javascript/openai",
+              "instrumentations/javascript/langchain",
+              "instrumentations/javascript/anthropic",
+              "instrumentations/javascript/bedrock",
+              "instrumentations/javascript/vercel",
+              "instrumentations/javascript/all-javascript"
+            ]
+          },
+          {
+            "group": "Java Instrumentations",
+            "pages": [
+              "instrumentations/java/langchain4j",
+              "instrumentations/java/spring-ai",
+              "instrumentations/java/all-java"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Python Examples",
+            "pages": [
+              "examples/python/openai-chat",
+              "examples/python/langchain-rag",
+              "examples/python/llama-index-query",
+              "examples/python/dspy-rag"
+            ]
+          },
+          {
+            "group": "JavaScript Examples",
+            "pages": [
+              "examples/javascript/openai-basic",
+              "examples/javascript/langchain-express",
+              "examples/javascript/nextjs-openai"
+            ]
+          },
+          {
+            "group": "Java Examples",
+            "pages": [
+              "examples/java/langchain4j-example",
+              "examples/java/spring-ai-example"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

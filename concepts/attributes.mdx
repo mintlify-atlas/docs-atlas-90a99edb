@@ -1,0 +1,385 @@
+---
+title: Attributes
+description: Attribute naming conventions, flattened lists, and types
+---
+
+Attributes are **typed key-value pairs** attached to spans following a structured naming convention. They are the primary payload of OpenInference: they carry the prompt, the response, the model name, the retrieved documents, the tool arguments, and everything else needed to understand and reproduce a given execution.
+
+## What Are Attributes?
+
+Attributes contain metadata that you can use to annotate a span to carry information about the operation it is tracking.
+
+For example, if a span invokes an LLM, you can capture:
+- The model name
+- The invocation parameters (temperature, max_tokens)
+- The token count
+- The input messages
+- The output messages
+
+## Attribute Rules
+
+Attributes have the following requirements:
+
+<AccordionGroup>
+  <Accordion title="Key requirements">
+    - Keys MUST be non-null string values
+    - Keys SHOULD follow dot-separated namespace conventions
+    - Keys MUST be unique within a span
+  </Accordion>
+
+  <Accordion title="Value types">
+    Values MUST be one of:
+    - Non-null string
+    - Boolean (`true` or `false`)
+    - Floating point value (e.g., `0.95`, `2.5`)
+    - Integer (e.g., `42`, `250`)
+    - Array of any of the above types
+  </Accordion>
+</AccordionGroup>
+
+## Semantic Conventions
+
+**Semantic Attributes** are standardized naming conventions for metadata that is typically present in common operations. It's helpful to use semantic attribute naming wherever possible so that common kinds of metadata are standardized across systems.
+
+<Info>
+  Always use semantic attribute names when available. This ensures consistency across different AI frameworks and observability platforms.
+</Info>
+
+The OpenInference [Semantic Conventions](/api-reference/semantic-conventions) define the complete list of standardized attributes.
+
+## Attribute Naming Conventions
+
+Attribute names use **dot-separated namespaces** to organize related attributes:
+
+```
+<namespace>.<component>.<property>
+```
+
+### Common Namespaces
+
+| Namespace | Purpose | Example |
+|-----------|---------|----------|
+| `openinference.*` | Core OpenInference attributes | `openinference.span.kind` |
+| `llm.*` | Language model operations | `llm.model_name`, `llm.token_count.prompt` |
+| `embedding.*` | Embedding generation | `embedding.model_name`, `embedding.embeddings` |
+| `tool.*` | Tool/function calls | `tool.name`, `tool.description` |
+| `retrieval.*` | Retrieval operations | `retrieval.documents` |
+| `reranker.*` | Reranking operations | `reranker.model_name`, `reranker.top_k` |
+| `message.*` | Chat messages | `message.role`, `message.content` |
+| `document.*` | Retrieved documents | `document.id`, `document.content` |
+| `input.*` | Operation inputs | `input.value`, `input.mime_type` |
+| `output.*` | Operation outputs | `output.value`, `output.mime_type` |
+| `session.*` | Session tracking | `session.id` |
+| `user.*` | User identification | `user.id` |
+
+## Flattened Lists (Indexed Attributes)
+
+When dealing with **lists of structured data**, OpenInference uses **indexed prefixes** to create flattened attribute names. This is necessary because OpenTelemetry attributes must be flat key-value pairs.
+
+### Pattern
+
+```
+<prefix>.<index>.<suffix>
+```
+
+Where:
+- `<prefix>` is the base attribute name (e.g., `llm.input_messages`)
+- `<index>` is a **zero-based integer** index
+- `<suffix>` is the nested attribute path
+
+### Example: Input Messages
+
+**Logical structure (for illustration):**
+```json
+{
+  "llm.input_messages": [
+    {
+      "message.role": "user",
+      "message.content": "Hello!"
+    },
+    {
+      "message.role": "assistant",
+      "message.content": "Hi there!"
+    }
+  ]
+}
+```
+
+**Actual flattened attributes:**
+```json
+{
+  "llm.input_messages.0.message.role": "user",
+  "llm.input_messages.0.message.content": "Hello!",
+  "llm.input_messages.1.message.role": "assistant",
+  "llm.input_messages.1.message.content": "Hi there!"
+}
+```
+
+<Note>
+  All list-based attributes use **zero-based indexing** in their flattened form.
+</Note>
+
+## Common Flattened Attribute Patterns
+
+### LLM Input/Output Messages
+
+```json
+{
+  "llm.input_messages.0.message.role": "user",
+  "llm.input_messages.0.message.content": "What is 2+2?",
+  "llm.output_messages.0.message.role": "assistant",
+  "llm.output_messages.0.message.content": "2+2 equals 4."
+}
+```
+
+### Tool Calls in Output Messages
+
+```json
+{
+  "llm.output_messages.0.message.role": "assistant",
+  "llm.output_messages.0.message.tool_calls.0.tool_call.id": "call_123",
+  "llm.output_messages.0.message.tool_calls.0.tool_call.function.name": "get_weather",
+  "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments": "{\"location\": \"SF\"}"
+}
+```
+
+### Retrieved Documents
+
+```json
+{
+  "retrieval.documents.0.document.id": "doc_1",
+  "retrieval.documents.0.document.content": "First document content",
+  "retrieval.documents.0.document.score": 0.95,
+  "retrieval.documents.1.document.id": "doc_2",
+  "retrieval.documents.1.document.content": "Second document content",
+  "retrieval.documents.1.document.score": 0.87
+}
+```
+
+### Embeddings
+
+```json
+{
+  "embedding.embeddings.0.embedding.text": "hello",
+  "embedding.embeddings.0.embedding.vector": [0.1, 0.2, 0.3],
+  "embedding.embeddings.1.embedding.text": "world",
+  "embedding.embeddings.1.embedding.vector": [0.4, 0.5, 0.6]
+}
+```
+
+### Available Tools
+
+```json
+{
+  "llm.tools.0.tool.json_schema": "{\"type\": \"function\", \"function\": {\"name\": \"get_weather\"}}",
+  "llm.tools.1.tool.json_schema": "{\"type\": \"function\", \"function\": {\"name\": \"search_web\"}}"
+}
+```
+
+## Multimodal Content
+
+For messages containing multiple content items (text, images, audio):
+
+```json
+{
+  "llm.input_messages.0.message.contents.0.message_content.type": "text",
+  "llm.input_messages.0.message.contents.0.message_content.text": "What's in this image?",
+  "llm.input_messages.0.message.contents.1.message_content.type": "image",
+  "llm.input_messages.0.message.contents.1.message_content.image.image.url": "https://example.com/image.jpg"
+}
+```
+
+## Nested Flattening Rules
+
+If objects are further nested, **flattening continues** until values are simple types:
+
+- `bool`
+- `str`
+- `bytes`
+- `int`
+- `float`
+- Simple lists: `List[bool]`, `List[str]`, `List[bytes]`, `List[int]`, `List[float]`
+
+<Warning>
+  Do NOT nest objects beyond what can be flattened into dot-separated keys with simple values.
+</Warning>
+
+## Implementation Examples
+
+### Python
+
+```python
+messages = [
+    {"message.role": "user", "message.content": "hello"},
+    {"message.role": "assistant", "message.content": "hi"}
+]
+
+for i, obj in enumerate(messages):
+    for key, value in obj.items():
+        span.set_attribute(f"llm.input_messages.{i}.{key}", value)
+```
+
+**Result:**
+```
+llm.input_messages.0.message.role = "user"
+llm.input_messages.0.message.content = "hello"
+llm.input_messages.1.message.role = "assistant"
+llm.input_messages.1.message.content = "hi"
+```
+
+### JavaScript/TypeScript
+
+```javascript
+const messages = [
+  { "message.role": "user", "message.content": "hello" },
+  { "message.role": "assistant", "message.content": "hi" },
+];
+
+for (const [i, obj] of messages.entries()) {
+  for (const [key, value] of Object.entries(obj)) {
+    span.setAttribute(`llm.input_messages.${i}.${key}`, value);
+  }
+}
+```
+
+### Go
+
+```go
+// Helper function for input message attributes
+func InputMessageAttribute(index int, suffix string) string {
+    return fmt.Sprintf("%s.%d.%s", LLMInputMessages, index, suffix)
+}
+
+// Usage
+span.SetAttribute(
+    InputMessageAttribute(0, "message.role"),
+    "user",
+)
+span.SetAttribute(
+    InputMessageAttribute(0, "message.content"),
+    "hello",
+)
+```
+
+## Hierarchical Attributes
+
+Some attributes use hierarchical dot notation for **related metrics**:
+
+### Token Counts
+
+```json
+{
+  "llm.token_count.prompt": 100,
+  "llm.token_count.completion": 50,
+  "llm.token_count.total": 150,
+  "llm.token_count.prompt_details.cache_read": 20,
+  "llm.token_count.prompt_details.cache_write": 5,
+  "llm.token_count.completion_details.reasoning": 10
+}
+```
+
+**Logical structure:**
+```json
+{
+  "llm.token_count": {
+    "prompt": 100,
+    "completion": 50,
+    "total": 150,
+    "prompt_details": {
+      "cache_read": 20,
+      "cache_write": 5
+    },
+    "completion_details": {
+      "reasoning": 10
+    }
+  }
+}
+```
+
+### Cost Tracking
+
+```json
+{
+  "llm.cost.prompt": 0.0021,
+  "llm.cost.completion": 0.0045,
+  "llm.cost.total": 0.0066,
+  "llm.cost.prompt_details.cache_read": 0.0003,
+  "llm.cost.completion_details.reasoning": 0.0024
+}
+```
+
+## Context Attributes
+
+Context attributes are **automatically propagated** to all spans in a trace:
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `session.id` | String | Unique session identifier |
+| `user.id` | String | Unique user identifier |
+| `metadata` | JSON String | Key-value metadata |
+| `tag.tags` | List of strings | Categorization tags |
+
+These attributes are set via the instrumentation context API and inherited by all child spans.
+
+## Reserved Attributes
+
+The following attributes are **reserved** and MUST be supported by all OpenInference implementations:
+
+- `openinference.span.kind` (REQUIRED)
+- `input.value`
+- `input.mime_type`
+- `output.value`
+- `output.mime_type`
+- `llm.system`
+- `llm.model_name`
+- `llm.input_messages`
+- `llm.output_messages`
+- `llm.token_count.*`
+- `embedding.model_name`
+- `embedding.embeddings`
+- `tool.name`
+- `retrieval.documents`
+- `reranker.*`
+
+See the complete [Semantic Conventions](/api-reference/semantic-conventions) for the full list.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use semantic conventions">
+    Always use standardized attribute names from the OpenInference specification. This ensures consistency and interoperability.
+  </Accordion>
+
+  <Accordion title="Be consistent with types">
+    Ensure attribute values match their expected types. For example, `llm.token_count.prompt` should always be an integer, not a string.
+  </Accordion>
+
+  <Accordion title="Flatten complex structures">
+    When dealing with nested data, flatten it using indexed dot notation. Do not attempt to store nested objects directly.
+  </Accordion>
+
+  <Accordion title="Include MIME types">
+    Always include `input.mime_type` and `output.mime_type` when setting `input.value` and `output.value`. This helps consumers parse the data correctly.
+  </Accordion>
+
+  <Accordion title="Use descriptive names for custom attributes">
+    If you need custom attributes beyond the semantic conventions, use clear, descriptive names with appropriate namespaces.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Semantic Conventions" icon="book" href="/api-reference/semantic-conventions">
+    Complete reference of all standardized attributes
+  </Card>
+  <Card title="Span Kinds" icon="list" href="/concepts/span-kinds">
+    Learn which attributes are used for each span kind
+  </Card>
+  <Card title="LLM Spans" icon="brain" href="/api-reference/llm-spans">
+    Detailed LLM-specific attributes
+  </Card>
+  <Card title="Embedding Spans" icon="vector-square" href="/api-reference/embedding-spans">
+    Embedding-specific attributes
+  </Card>
+</CardGroup>

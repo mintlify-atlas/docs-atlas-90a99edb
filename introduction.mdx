@@ -1,0 +1,153 @@
+---
+title: Introduction to OpenInference
+description: OpenTelemetry-based semantic conventions for AI observability. Trace LLM applications with consistent, vendor-agnostic instrumentation across Python, JavaScript, and Java.
+---
+
+OpenInference is a set of semantic conventions and instrumentation libraries built on [OpenTelemetry](https://opentelemetry.io/) to enable comprehensive observability for AI applications. It standardizes how LLM calls, agent reasoning steps, tool invocations, retrieval operations, and other AI-specific workloads are represented as distributed traces.
+
+<CardGroup cols={2}>
+  <Card title="Python" icon="python" href="/python">
+    Instrumentation for OpenAI, LangChain, LlamaIndex, DSPy, and 30+ frameworks
+  </Card>
+  <Card title="JavaScript" icon="js" href="/javascript">
+    Node.js instrumentations for OpenAI, LangChain, Anthropic, and more
+  </Card>
+  <Card title="Java" icon="java" href="/java">
+    Auto-instrumentation for LangChain4j and Spring AI applications
+  </Card>
+  <Card title="Specification" icon="book" href="https://arize-ai.github.io/openinference/spec/">
+    Semantic conventions and attribute reference
+  </Card>
+</CardGroup>
+
+## Why OpenInference?
+
+OpenTelemetry provides a universal wire format for distributed tracing, but AI applications have unique observability requirements that generic conventions don't address:
+
+<CardGroup cols={2}>
+  <Card title="Structured AI data" icon="messages">
+    LLM calls carry multi-turn message arrays, system prompts, tool definitions, and multimodal content — a single `input.value` string is insufficient.
+  </Card>
+  <Card title="Token economics" icon="coins">
+    Track prompt and completion token counts, cached tokens, and reasoning token breakdowns as first-class operational metrics.
+  </Card>
+  <Card title="Agentic control flow" icon="diagram-project">
+    Modern AI systems route through reasoning loops, delegate to sub-agents, and invoke tools. Each operation needs consistent identity and span-kind taxonomy.
+  </Card>
+  <Card title="Privacy controls" icon="shield-halved">
+    Prompts and completions frequently contain personal information. OpenInference supports per-field masking before export.
+  </Card>
+</CardGroup>
+
+OpenInference solves these problems by defining a concrete attribute schema and span-kind taxonomy on top of OpenTelemetry spans. **Every OpenInference trace is a valid OTLP trace** — the conventions give attribute names their AI-specific meaning.
+
+## Key features
+
+### Multi-language support
+
+OpenInference provides instrumentation libraries for the most popular AI development languages:
+
+- **Python**: 30+ instrumentations including OpenAI, Anthropic, LangChain, LlamaIndex, DSPy, CrewAI, Bedrock, VertexAI, and more
+- **JavaScript/TypeScript**: Node.js instrumentations for OpenAI, LangChain, Anthropic, Bedrock, BeeAI, and MCP
+- **Java**: Auto-instrumentation for LangChain4j and Spring AI
+
+### Comprehensive AI span kinds
+
+OpenInference defines 10 span kinds that cover the full spectrum of AI operations:
+
+| Span kind | Description |
+|-----------|-------------|
+| `LLM` | Language model API calls with messages, token counts, and parameters |
+| `AGENT` | Autonomous reasoning steps that spawn child spans for tools and retrievals |
+| `TOOL` | Function or external API execution called by a language model |
+| `RETRIEVER` | Vector store, search engine, or knowledge base queries |
+| `EMBEDDING` | Vector embedding generation from text or other content |
+| `CHAIN` | Deterministic sequences like prompt formatting or orchestration |
+| `RERANKER` | Reranking models that reorder documents by relevance |
+| `GUARDRAIL` | Input/output moderation and safety checks |
+| `EVALUATOR` | Automated evaluation of model responses (LLM-as-judge) |
+| `PROMPT` | Named prompt template invocations |
+
+### Rich attribute schema
+
+Capture everything you need to understand and reproduce AI application behavior:
+
+- **LLM attributes**: Input/output messages, model name, provider, token counts (prompt, completion, cached, reasoning), costs, invocation parameters
+- **Tool attributes**: Tool definitions, function calls, arguments, and results
+- **Retrieval attributes**: Documents with content, scores, IDs, and metadata
+- **Multimodal attributes**: Images, audio, and mixed-content messages
+- **Context attributes**: Session IDs, user IDs, metadata, tags, and prompt templates
+
+### Privacy and data masking
+
+Control what sensitive data gets exported:
+
+```python
+from openinference.instrumentation import TraceConfig
+
+config = TraceConfig(
+    hide_inputs=True,
+    hide_outputs=True,
+    hide_input_messages=True,
+    hide_output_messages=True,
+)
+```
+
+### Works with any OpenTelemetry backend
+
+Send traces to any OTLP-compatible collector:
+
+<CardGroup cols={3}>
+  <Card title="Arize Phoenix" icon="phoenix-framework">
+    Open source AI observability platform with native OpenInference support
+  </Card>
+  <Card title="Arize" icon="chart-line">
+    Production AI monitoring and observability platform
+  </Card>
+  <Card title="OTLP Collectors" icon="server">
+    Any OpenTelemetry-compatible backend (Jaeger, Zipkin, Datadog, etc.)
+  </Card>
+</CardGroup>
+
+## Data model
+
+### Traces
+
+A trace records the full execution path of a request — from the user's initial input through every LLM call, tool invocation, and retrieval step to the final response. Traces are trees of spans connected by parent–child relationships.
+
+### Spans
+
+A span is the atomic unit of work: one LLM call, one tool execution, one retrieval query. Every span carries:
+
+- **Name**: Human-readable operation name (e.g., `ChatCompletion`, `web_search`)
+- **Timestamps**: Start and end time with nanosecond precision
+- **Span kind**: The role of this operation (`openinference.span.kind`)
+- **Attributes**: Typed key/value pairs capturing inputs, outputs, configuration, and cost
+- **Status**: `OK`, `ERROR`, or `UNSET`
+
+### Attributes
+
+Attributes are typed key/value pairs following a structured naming convention:
+
+- Dot-separated namespaces: `llm.input_messages`, `llm.token_count.prompt`
+- Flattened list indices: `llm.input_messages.0.message.role`
+- JSON strings for complex objects: `llm.invocation_parameters`
+
+See the [semantic conventions](https://arize-ai.github.io/openinference/spec/semantic_conventions.html) for the complete attribute reference.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get started with OpenInference in 5 minutes
+  </Card>
+  <Card title="Python guide" icon="python" href="/python">
+    Explore Python instrumentation libraries
+  </Card>
+  <Card title="JavaScript guide" icon="js" href="/javascript">
+    Explore JavaScript/TypeScript instrumentations
+  </Card>
+  <Card title="Specification" icon="book" href="https://arize-ai.github.io/openinference/spec/">
+    Read the full semantic conventions
+  </Card>
+</CardGroup>

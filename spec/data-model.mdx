@@ -1,0 +1,49 @@
+---
+title: "Data Model"
+description: "Core concepts of the OpenInference tracing data model"
+---
+
+OpenInference uses a hierarchical data model to represent AI application execution as distributed traces.
+
+## Traces
+
+A trace records the full execution path of a request — from the user's initial input through every LLM call, tool invocation, and retrieval step to the final response. Traces are trees of spans connected by parent–child relationships. The root span typically represents an agent turn or pipeline invocation; child spans represent individual operations within it.
+
+## Spans
+
+A span is the atomic unit of work: one LLM call, one tool execution, one retrieval query, one embedding generation. Every span carries:
+
+| Field | Description |
+|---|---|
+| Name | Human-readable operation name (e.g., `ChatCompletion`, `web_search`) |
+| Start / end time | Wall-clock timestamps with nanosecond precision |
+| `openinference.span.kind` | The role of this operation in the pipeline (see [Span Kinds](#span-kinds)) |
+| Attributes | Typed key/value pairs capturing inputs, outputs, configuration, and cost |
+| Status | `OK`, `ERROR`, or `UNSET` |
+
+## Span Kinds
+
+The `openinference.span.kind` attribute classifies what an operation does, enabling observability platforms to render traces with AI-aware visualizations and aggregations:
+
+| Kind | Description |
+|---|---|
+| `LLM` | A call to a language model API. Carries input messages, model parameters, output messages, and token counts. |
+| `AGENT` | A reasoning step in an autonomous agent. May spawn child spans for tool calls, retrievals, or nested LLM calls. |
+| `CHAIN` | A deterministic sequence of operations such as prompt formatting, post-processing, or orchestration logic. |
+| `TOOL` | Execution of a function or external API called by a language model. |
+| `RETRIEVER` | A query to a vector store, search engine, or knowledge base. |
+| `RERANKER` | A reranking model that reorders a candidate set of documents by relevance. |
+| `EMBEDDING` | Generation of vector embeddings from text or other content. |
+| `GUARDRAIL` | An input or output moderation check. |
+| `EVALUATOR` | An automated evaluation of a model response (e.g., LLM-as-judge). |
+| `PROMPT` | A named prompt template invocation. |
+
+## Attributes
+
+Attributes are typed key/value pairs attached to spans following a structured naming convention. They are the primary payload of OpenInference: they carry the prompt, the response, the model name, the retrieved documents, the tool arguments, and everything else needed to understand and reproduce a given execution.
+
+Attribute names use dot-separated namespaces (e.g., `llm.input_messages`, `llm.token_count.prompt`). List-valued attributes use zero-based integer indices in flattened form (e.g., `llm.input_messages.0.message.role`).
+
+<Info>
+The [Semantic Conventions](/spec/semantic-conventions) document is the authoritative reference for all attribute names, types, and meanings.
+</Info>

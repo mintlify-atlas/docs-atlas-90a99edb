@@ -1,0 +1,325 @@
+---
+title: LangChain with Express
+description: Build a RAG API with LangChain and Express.js with OpenInference
+---
+
+This example shows how to build a retrieval-augmented generation (RAG) API using LangChain, Express.js, and OpenInference instrumentation.
+
+## Prerequisites
+
+- Node.js 18+
+- OpenAI API key
+- Phoenix or another OpenTelemetry collector
+
+## Installation
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    npm install express langchain @langchain/openai @langchain/core \
+      @arizeai/openinference-instrumentation-langchain \
+      @opentelemetry/sdk-trace-node \
+      @opentelemetry/exporter-trace-otlp-proto \
+      cors dotenv
+    ```
+  </Step>
+
+  <Step title="Set environment variables">
+    ```bash
+    export OPENAI_API_KEY="your-api-key"
+    export COLLECTOR_ENDPOINT="http://localhost:6006/v1/traces"
+    ```
+  </Step>
+</Steps>
+
+## Project Structure
+
+```
+backend/
+├── instrumentation.ts
+├── index.ts
+└── src/
+    ├── routes/
+    │   └── chat.route.ts
+    ├── controllers/
+    │   └── chat.controller.ts
+    ├── vector_store/
+    │   └── store.ts
+    └── constants.ts
+```
+
+## Instrumentation Setup
+
+Create `instrumentation.ts`:
+
+```typescript
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+import { ConsoleSpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { Resource } from "@opentelemetry/resources";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
+import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
+import { LangChainInstrumentation } from "@arizeai/openinference-instrumentation-langchain";
+import * as lcCallbackManager from "@langchain/core/callbacks/manager";
+
+// For troubleshooting, set the log level to DiagLogLevel.DEBUG
+diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
+
+const provider = new NodeTracerProvider({
+  resource: new Resource({
+    [SemanticResourceAttributes.SERVICE_NAME]: "chat-service",
+  }),
+});
+
+provider.addSpanProcessor(new SimpleSpanProcessor(new ConsoleSpanExporter()));
+provider.addSpanProcessor(
+  new SimpleSpanProcessor(
+    new OTLPTraceExporter({
+      url: process.env.COLLECTOR_ENDPOINT || "http://localhost:6006/v1/traces",
+    }),
+  ),
+);
+
+registerInstrumentations({
+  instrumentations: [],
+});
+
+// LangChain must be manually instrumented as it doesn't have a traditional module structure
+const lcInstrumentation = new LangChainInstrumentation();
+lcInstrumentation.manuallyInstrument(lcCallbackManager);
+
+provider.register();
+
+console.log("👀 OpenInference initialized");
+```
+
+## Express Server Setup
+
+Create `index.ts`:
+
+```typescript
+import cors from "cors";
+import "dotenv/config";
+import express, { Express, Request, Response } from "express";
+import { createChatRouter } from "./src/routes/chat.route";
+import { initializeVectorStore } from "./src/vector_store/store";
+
+const app: Express = express();
+const port = parseInt(process.env.PORT || "8000");
+
+const env = process.env["NODE_ENV"];
+const isDevelopment = !env || env === "development";
+const prodCorsOrigin = process.env["PROD_CORS_ORIGIN"];
+
+app.use(express.json());
+
+if (isDevelopment) {
+  console.warn("Running in development mode - allowing CORS for all origins");
+  app.use(cors());
+} else if (prodCorsOrigin) {
+  console.log(
+    `Running in production mode - allowing CORS for domain: ${prodCorsOrigin}`,
+  );
+  const corsOptions = {
+    origin: prodCorsOrigin, // Restrict to production domain
+  };
+  app.use(cors(corsOptions));
+} else {
+  console.warn("Production CORS origin not set, defaulting to no CORS.");
+}
+
+app.get("/", (req: Request, res: Response) => {
+  res.send("Arize Express Server");
+});
+
+initializeVectorStore()
+  .then((vectorStore) => {
+    app.use("/api/chat", createChatRouter(vectorStore));
+    app.listen(port, () => {
+      console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
+    });
+  })
+  .catch((error) => {
+    console.error("Error initializing store:", error);
+  });
+```
+
+## Chat Controller with RAG
+
+Create `src/controllers/chat.controller.ts`:
+
+```typescript
+import { Request, Response } from "express";
+import { ChatOpenAI } from "@langchain/openai";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { MemoryVectorStore } from "langchain/vectorstores/memory";
+import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
+import { createRetrievalChain } from "langchain/chains/retrieval";
+
+const SYSTEM_PROMPT_TEMPLATE = `
+You are an assistant for question-answering tasks.
+Use the following pieces of retrieved context to answer the question.
+If you don't know the answer, say that you don't know.
+Use three sentences maximum and keep the answer concise.
+
+Context: {context}
+`;
+
+export const createChatController =
+  (vectorStore: MemoryVectorStore) => async (req: Request, res: Response) => {
+    try {
+      const { messages } = req.body;
+
+      if (!messages) {
+        return res.status(400).json({
+          error: "messages are required in the request body",
+        });
+      }
+
+      const llm = new ChatOpenAI({
+        modelName: "gpt-3.5-turbo",
+        streaming: false,
+      });
+
+      const qaPrompt = ChatPromptTemplate.fromMessages([
+        ["system", SYSTEM_PROMPT_TEMPLATE],
+        ["human", "{input}"],
+      ]);
+
+      const retriever = vectorStore.asRetriever();
+
+      const combineDocsChain = await createStuffDocumentsChain({
+        llm,
+        prompt: qaPrompt,
+      });
+      
+      const ragChain = await createRetrievalChain({
+        combineDocsChain,
+        retriever,
+      });
+
+      const userQuestion = messages[messages.length - 1].content;
+      const response = await ragChain.invoke({
+        input: userQuestion,
+      });
+
+      if (response.answer == null) {
+        throw new Error("No response from the model");
+      }
+      
+      res.send(response.answer);
+      res.end();
+    } catch (error) {
+      console.error("Error:", error);
+      return res.status(500).json({
+        error: (error as Error).message,
+      });
+    }
+  };
+```
+
+## Vector Store Initialization
+
+Create `src/vector_store/store.ts`:
+
+```typescript
+import { MemoryVectorStore } from "langchain/vectorstores/memory";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { Document } from "@langchain/core/documents";
+
+export async function initializeVectorStore(): Promise<MemoryVectorStore> {
+  const embeddings = new OpenAIEmbeddings({
+    modelName: "text-embedding-3-small",
+  });
+
+  // Sample documents - replace with your own data
+  const docs = [
+    new Document({
+      pageContent: "LangChain is a framework for developing applications powered by language models.",
+      metadata: { source: "docs" },
+    }),
+    new Document({
+      pageContent: "OpenInference provides OpenTelemetry-native instrumentation for LLM applications.",
+      metadata: { source: "docs" },
+    }),
+    new Document({
+      pageContent: "Phoenix is an open-source observability platform for AI applications.",
+      metadata: { source: "docs" },
+    }),
+  ];
+
+  const vectorStore = await MemoryVectorStore.fromDocuments(docs, embeddings);
+  console.log("✅ Vector store initialized");
+  
+  return vectorStore;
+}
+```
+
+## Chat Route
+
+Create `src/routes/chat.route.ts`:
+
+```typescript
+import { Router } from "express";
+import { MemoryVectorStore } from "langchain/vectorstores/memory";
+import { createChatController } from "../controllers/chat.controller";
+
+export const createChatRouter = (vectorStore: MemoryVectorStore): Router => {
+  const router = Router();
+  router.post("/", createChatController(vectorStore));
+  return router;
+};
+```
+
+## Run the Server
+
+```bash
+npx tsx index.ts
+```
+
+## Test with cURL
+
+```bash
+curl -X POST http://localhost:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      {"role": "user", "content": "What is OpenInference?"}
+    ]
+  }'
+```
+
+## Key Features
+
+### Automatic Chain Tracing
+
+LangChain instrumentation captures:
+- **Retrieval chains**: Document retrieval and ranking
+- **LLM calls**: All language model interactions
+- **Prompt templates**: Template rendering with variables
+- **Vector store queries**: Similarity search operations
+
+### Manual Instrumentation
+
+LangChain requires manual instrumentation due to its module structure:
+
+```typescript
+import * as lcCallbackManager from "@langchain/core/callbacks/manager";
+
+const lcInstrumentation = new LangChainInstrumentation();
+lcInstrumentation.manuallyInstrument(lcCallbackManager);
+```
+
+### Production Considerations
+
+- Use environment-based CORS configuration
+- Implement proper error handling
+- Add rate limiting and authentication
+- Use persistent vector stores (Pinecone, Weaviate, etc.)
+
+## Next Steps
+
+- Add [streaming responses](/examples/javascript/langchain-streaming)
+- Implement [agent patterns](/examples/javascript/langchain-agents)
+- Explore [Next.js integration](/examples/javascript/nextjs-openai)

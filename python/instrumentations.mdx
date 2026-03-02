@@ -1,0 +1,200 @@
+---
+title: Python Instrumentations
+description: Auto-instrumentation packages for popular AI/ML frameworks
+---
+
+OpenInference provides auto-instrumentation packages for popular AI/ML frameworks and LLM providers.
+
+## Available Instrumentations
+
+| Package | Framework | Description |
+|---------|-----------|-------------|
+| `openinference-instrumentation-openai` | OpenAI | OpenAI Python SDK (chat, completions, embeddings, assistants) |
+| `openinference-instrumentation-langchain` | LangChain | LangChain framework for LLM applications |
+| `openinference-instrumentation-llama-index` | LlamaIndex | LlamaIndex data framework (formerly GPT Index) |
+| `openinference-instrumentation-anthropic` | Anthropic | Anthropic Claude API |
+| `openinference-instrumentation-bedrock` | AWS Bedrock | Amazon Bedrock LLM service |
+| `openinference-instrumentation-vertexai` | Vertex AI | Google Cloud Vertex AI |
+| `openinference-instrumentation-mistralai` | Mistral AI | Mistral AI models |
+| `openinference-instrumentation-groq` | Groq | Groq LLM API |
+| `openinference-instrumentation-litellm` | LiteLLM | LiteLLM unified LLM interface |
+| `openinference-instrumentation-dspy` | DSPy | DSPy framework for LM programs |
+| `openinference-instrumentation-haystack` | Haystack | Haystack NLP framework |
+| `openinference-instrumentation-crewai` | CrewAI | CrewAI multi-agent framework |
+| `openinference-instrumentation-autogen` | AutoGen | Microsoft AutoGen framework |
+| `openinference-instrumentation-autogen-agentchat` | AutoGen AgentChat | AutoGen AgentChat API |
+| `openinference-instrumentation-instructor` | Instructor | Instructor structured outputs library |
+| `openinference-instrumentation-guardrails` | Guardrails AI | Guardrails AI validation framework |
+| `openinference-instrumentation-pydantic-ai` | Pydantic AI | Pydantic AI agent framework |
+| `openinference-instrumentation-smolagents` | smol-agents | Hugging Face smol-agents |
+| `openinference-instrumentation-google-genai` | Google GenAI | Google Generative AI SDK |
+| `openinference-instrumentation-google-adk` | Google ADK | Google Agent Developer Kit |
+| `openinference-instrumentation-openai-agents` | OpenAI Agents | OpenAI Agents API |
+| `openinference-instrumentation-mcp` | MCP | Model Context Protocol servers |
+| `openinference-instrumentation-beeai` | BeeAI | BeeAI agent framework |
+| `openinference-instrumentation-agno` | Agno | Agno agent framework |
+| `openinference-instrumentation-strands-agents` | Strands Agents | Strands agent framework |
+| `openinference-instrumentation-portkey` | Portkey | Portkey AI gateway |
+| `openinference-instrumentation-openllmetry` | OpenLLMetry | OpenLLMetry observability |
+| `openinference-instrumentation-openlit` | OpenLIT | OpenLIT observability |
+| `openinference-instrumentation-pipecat` | Pipecat | Pipecat voice agents |
+| `openinference-instrumentation-agentspec` | AgentSpec | AgentSpec protocol |
+| `openinference-instrumentation-agent-framework` | Agent Framework | Generic agent framework support |
+
+## Installation
+
+Install any instrumentation package using pip:
+
+```bash
+pip install openinference-instrumentation-{name}
+```
+
+For example:
+
+```bash
+pip install openinference-instrumentation-openai
+pip install openinference-instrumentation-langchain
+pip install openinference-instrumentation-llama-index
+```
+
+## Basic Usage Pattern
+
+All instrumentations follow a similar pattern:
+
+<CodeGroup>
+
+```python Setup
+from openinference.instrumentation.{name} import {Name}Instrumentor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+# Configure tracer provider
+tracer_provider = TracerProvider()
+tracer_provider.add_span_processor(
+    SimpleSpanProcessor(OTLPSpanExporter("http://localhost:6006/v1/traces"))
+)
+
+# Instrument
+{Name}Instrumentor().instrument(tracer_provider=tracer_provider)
+```
+
+```python With TraceConfig
+from openinference.instrumentation import TraceConfig
+from openinference.instrumentation.{name} import {Name}Instrumentor
+
+config = TraceConfig(
+    hide_inputs=False,
+    hide_outputs=False,
+    base64_image_max_length=1000
+)
+
+{Name}Instrumentor().instrument(
+    tracer_provider=tracer_provider,
+    config=config
+)
+```
+
+```python Uninstrument
+# Remove instrumentation
+{Name}Instrumentor().uninstrument()
+```
+
+</CodeGroup>
+
+## Example: OpenAI
+
+```python
+import openai
+from openinference.instrumentation.openai import OpenAIInstrumentor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+# Setup tracing
+tracer_provider = TracerProvider()
+tracer_provider.add_span_processor(
+    SimpleSpanProcessor(OTLPSpanExporter("http://localhost:6006/v1/traces"))
+)
+
+# Instrument OpenAI
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+
+# Use OpenAI as normal - automatically traced
+client = openai.OpenAI()
+response = client.chat.completions.create(
+    model="gpt-4",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+```
+
+## Example: LangChain
+
+```python
+from langchain.chains import LLMChain
+from langchain.llms import OpenAI
+from langchain.prompts import PromptTemplate
+from openinference.instrumentation.langchain import LangChainInstrumentor
+
+# Instrument LangChain
+LangChainInstrumentor().instrument(tracer_provider=tracer_provider)
+
+# Use LangChain - automatically traced
+llm = OpenAI(temperature=0.9)
+prompt = PromptTemplate(
+    input_variables=["product"],
+    template="What is a good name for a company that makes {product}?",
+)
+chain = LLMChain(llm=llm, prompt=prompt)
+response = chain.run("eco-friendly water bottles")
+```
+
+## Example: LlamaIndex
+
+```python
+from llama_index import VectorStoreIndex, SimpleDirectoryReader
+from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
+
+# Instrument LlamaIndex
+LlamaIndexInstrumentor().instrument(tracer_provider=tracer_provider)
+
+# Use LlamaIndex - automatically traced
+documents = SimpleDirectoryReader("data").load_data()
+index = VectorStoreIndex.from_documents(documents)
+query_engine = index.as_query_engine()
+response = query_engine.query("What is the main topic?")
+```
+
+## Features
+
+All instrumentations provide:
+
+- **Automatic span creation** - Traces are created without code changes
+- **OpenInference semantic conventions** - Standardized attributes
+- **Context propagation** - Session, user, metadata, tags
+- **TraceConfig support** - Privacy and payload controls
+- **Suppression support** - Use `suppress_tracing()` to pause tracing
+- **OpenTelemetry compatible** - Works with any OTel collector
+
+## Testing
+
+Instrumentations use pytest with VCR cassettes for testing:
+
+```bash
+# Run tests for a specific instrumentation
+cd python/instrumentation/openinference-instrumentation-openai
+pytest tests/
+
+# Record new cassettes (requires API key)
+pytest tests/ -k test_name --vcr-record=once
+```
+
+## Contributing
+
+See the [development guide](https://github.com/Arize-ai/openinference/blob/main/python/DEVELOPMENT.md) for creating new instrumentations.
+
+## Resources
+
+- [GitHub Repository](https://github.com/Arize-ai/openinference)
+- [OpenInference Specification](https://github.com/Arize-ai/openinference/tree/main/spec)
+- [Phoenix Documentation](https://docs.arize.com/phoenix)

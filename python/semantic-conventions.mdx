@@ -1,0 +1,185 @@
+---
+title: Semantic Conventions
+description: OpenInference semantic conventions for standardized trace attributes
+---
+
+The `openinference-semantic-conventions` package defines standardized attributes for tracing AI/ML applications using OpenTelemetry.
+
+## Installation
+
+```bash
+pip install openinference-semantic-conventions
+```
+
+## SpanAttributes
+
+The `SpanAttributes` class contains attribute keys for annotating spans with metadata about LLM calls, embeddings, retrievals, and more.
+
+### Import
+
+```python
+from openinference.semconv.trace import SpanAttributes
+```
+
+### Core Attributes
+
+<CodeGroup>
+
+```python Input/Output
+SpanAttributes.INPUT_VALUE = "input.value"
+SpanAttributes.INPUT_MIME_TYPE = "input.mime_type"
+SpanAttributes.OUTPUT_VALUE = "output.value"
+SpanAttributes.OUTPUT_MIME_TYPE = "output.mime_type"
+```
+
+```python Session & User
+SpanAttributes.SESSION_ID = "session.id"
+SpanAttributes.USER_ID = "user.id"
+```
+
+```python Metadata & Tags
+SpanAttributes.METADATA = "metadata"
+SpanAttributes.TAG_TAGS = "tag.tags"
+```
+
+</CodeGroup>
+
+### LLM Attributes
+
+Attributes specific to Large Language Model operations:
+
+<CodeGroup>
+
+```python Model Information
+SpanAttributes.LLM_MODEL_NAME = "llm.model_name"
+SpanAttributes.LLM_PROVIDER = "llm.provider"
+SpanAttributes.LLM_SYSTEM = "llm.system"
+```
+
+```python Messages
+SpanAttributes.LLM_INPUT_MESSAGES = "llm.input_messages"
+SpanAttributes.LLM_OUTPUT_MESSAGES = "llm.output_messages"
+```
+
+```python Invocation
+SpanAttributes.LLM_INVOCATION_PARAMETERS = "llm.invocation_parameters"
+SpanAttributes.LLM_FUNCTION_CALL = "llm.function_call"
+SpanAttributes.LLM_TOOLS = "llm.tools"
+```
+
+```python Tokens & Cost
+SpanAttributes.LLM_TOKEN_COUNT_PROMPT = "llm.token_count.prompt"
+SpanAttributes.LLM_TOKEN_COUNT_COMPLETION = "llm.token_count.completion"
+SpanAttributes.LLM_TOKEN_COUNT_TOTAL = "llm.token_count.total"
+SpanAttributes.LLM_COST_TOTAL = "llm.cost.total"
+```
+
+```python Prompt Templates
+SpanAttributes.LLM_PROMPT_TEMPLATE = "llm.prompt_template.template"
+SpanAttributes.LLM_PROMPT_TEMPLATE_VERSION = "llm.prompt_template.version"
+SpanAttributes.LLM_PROMPT_TEMPLATE_VARIABLES = "llm.prompt_template.variables"
+```
+
+</CodeGroup>
+
+### Embedding Attributes
+
+```python
+SpanAttributes.EMBEDDING_EMBEDDINGS = "embedding.embeddings"
+SpanAttributes.EMBEDDING_MODEL_NAME = "embedding.model_name"
+SpanAttributes.EMBEDDING_INVOCATION_PARAMETERS = "embedding.invocation_parameters"
+```
+
+### Retrieval Attributes
+
+```python
+SpanAttributes.RETRIEVAL_DOCUMENTS = "retrieval.documents"
+```
+
+### Tool Attributes
+
+```python
+SpanAttributes.TOOL_NAME = "tool.name"
+SpanAttributes.TOOL_DESCRIPTION = "tool.description"
+SpanAttributes.TOOL_PARAMETERS = "tool.parameters"
+```
+
+## OpenInferenceSpanKindValues
+
+The `OpenInferenceSpanKindValues` enum defines the types of operations in an AI application:
+
+```python
+from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+class OpenInferenceSpanKindValues(Enum):
+    CHAIN = "CHAIN"           # Sequence of operations
+    AGENT = "AGENT"           # Autonomous agent
+    LLM = "LLM"               # Language model call
+    RETRIEVER = "RETRIEVER"   # Document retrieval
+    EMBEDDING = "EMBEDDING"   # Embedding generation
+    TOOL = "TOOL"             # Tool execution
+    RERANKER = "RERANKER"     # Document reranking
+    GUARDRAIL = "GUARDRAIL"   # Safety/validation
+    EVALUATOR = "EVALUATOR"   # Evaluation/scoring
+    PROMPT = "PROMPT"         # Prompt formatting
+    UNKNOWN = "UNKNOWN"       # Unknown operation
+```
+
+### Usage Example
+
+```python
+from openinference.semconv.trace import SpanAttributes, OpenInferenceSpanKindValues
+
+# Set span kind
+span.set_attribute(
+    SpanAttributes.OPENINFERENCE_SPAN_KIND,
+    OpenInferenceSpanKindValues.LLM.value
+)
+
+# Set model information
+span.set_attribute(SpanAttributes.LLM_MODEL_NAME, "gpt-4")
+span.set_attribute(SpanAttributes.LLM_PROVIDER, "openai")
+
+# Set session and user
+span.set_attribute(SpanAttributes.SESSION_ID, "session-123")
+span.set_attribute(SpanAttributes.USER_ID, "user-456")
+```
+
+## Message Attributes
+
+For detailed message content:
+
+```python
+from openinference.semconv.trace import MessageAttributes
+
+MessageAttributes.MESSAGE_ROLE = "message.role"
+MessageAttributes.MESSAGE_CONTENT = "message.content"
+MessageAttributes.MESSAGE_TOOL_CALLS = "message.tool_calls"
+MessageAttributes.MESSAGE_FUNCTION_CALL_NAME = "message.function_call_name"
+```
+
+## Document Attributes
+
+For retrieval results:
+
+```python
+from openinference.semconv.trace import DocumentAttributes
+
+DocumentAttributes.DOCUMENT_ID = "document.id"
+DocumentAttributes.DOCUMENT_SCORE = "document.score"
+DocumentAttributes.DOCUMENT_CONTENT = "document.content"
+DocumentAttributes.DOCUMENT_METADATA = "document.metadata"
+```
+
+## Additional Attribute Classes
+
+- `MessageContentAttributes` - Multi-modal message content (text, images)
+- `ImageAttributes` - Image URLs and data
+- `AudioAttributes` - Audio files and transcripts
+- `EmbeddingAttributes` - Individual embedding vectors
+- `RerankerAttributes` - Reranker inputs/outputs
+- `ToolCallAttributes` - Function call details
+- `PromptAttributes` - Completion API prompts
+- `ChoiceAttributes` - Completion API choices
+
+See the [full source code](https://github.com/Arize-ai/openinference/blob/main/python/openinference-semantic-conventions/src/openinference/semconv/trace/__init__.py) for complete attribute definitions.

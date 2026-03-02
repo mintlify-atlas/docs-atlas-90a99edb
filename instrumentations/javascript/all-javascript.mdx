@@ -1,0 +1,95 @@
+---
+title: All JavaScript Packages
+description: Complete list of OpenInference JavaScript instrumentation packages
+---
+
+OpenInference provides a comprehensive set of JavaScript/TypeScript packages for instrumenting AI/ML applications with OpenTelemetry.
+
+## Instrumentation Packages
+
+These packages provide automatic instrumentation for popular AI SDKs and frameworks:
+
+| Package | Description | npm |
+| --- | --- | --- |
+| **[@arizeai/openinference-instrumentation-openai](./openai)** | Auto-instrumentation for OpenAI Node.js SDK | [npm](https://www.npmjs.com/package/@arizeai/openinference-instrumentation-openai) |
+| **[@arizeai/openinference-instrumentation-anthropic](./anthropic)** | Auto-instrumentation for Anthropic SDK | [npm](https://www.npmjs.com/package/@arizeai/openinference-instrumentation-anthropic) |
+| **[@arizeai/openinference-instrumentation-langchain](./langchain)** | Auto-instrumentation for LangChain.js v1+ | [npm](https://www.npmjs.com/package/@arizeai/openinference-instrumentation-langchain) |
+| **@arizeai/openinference-instrumentation-langchain-v0** | Auto-instrumentation for LangChain.js v0.X (deprecated) | [npm](https://www.npmjs.com/package/@arizeai/openinference-instrumentation-langchain-v0) |
+| **[@arizeai/openinference-instrumentation-bedrock](./bedrock)** | Auto-instrumentation for AWS Bedrock Runtime | [npm](https://www.npmjs.com/package/@arizeai/openinference-instrumentation-bedrock) |
+| **@arizeai/openinference-instrumentation-bedrock-agent-runtime** | Auto-instrumentation for AWS Bedrock Agent Runtime | [npm](https://www.npmjs.com/package/@arizeai/openinference-instrumentation-bedrock-agent-runtime) |
+| **@arizeai/openinference-instrumentation-beeai** | Auto-instrumentation for BeeAI framework | [npm](https://www.npmjs.com/package/@arizeai/openinference-instrumentation-beeai) |
+| **@arizeai/openinference-instrumentation-claude-agent-sdk** | Auto-instrumentation for Claude Agent SDK | [npm](https://www.npmjs.com/package/@arizeai/openinference-instrumentation-claude-agent-sdk) |
+| **@arizeai/openinference-instrumentation-mcp** | Auto-instrumentation for MCP TypeScript SDK | [npm](https://www.npmjs.com/package/@arizeai/openinference-instrumentation-mcp) |
+| **[@arizeai/openinference-vercel](./vercel)** | Utilities for ingesting Vercel AI SDK spans | [npm](https://www.npmjs.com/package/@arizeai/openinference-vercel) |
+| **@arizeai/openinference-mastra** | Utilities for ingesting Mastra spans (deprecated) | [npm](https://www.npmjs.com/package/@arizeai/openinference-mastra) |
+
+## Core Packages
+
+These packages provide foundational functionality for building instrumentations and working with OpenInference:
+
+| Package | Description | npm |
+| --- | --- | --- |
+| **@arizeai/openinference-core** | Shared tracing foundation with context propagation, span wrappers, and attribute helpers | [npm](https://www.npmjs.com/package/@arizeai/openinference-core) |
+| **@arizeai/openinference-genai** | Utilities to convert OpenTelemetry GenAI span attributes to OpenInference | [npm](https://www.npmjs.com/package/@arizeai/openinference-genai) |
+| **@arizeai/openinference-semantic-conventions** | OpenInference semantic conventions for JavaScript | [npm](https://www.npmjs.com/package/@arizeai/openinference-semantic-conventions) |
+
+## Installation
+
+All packages are available via npm and can be installed using your preferred package manager:
+
+<CodeGroup>
+```bash npm
+npm install @arizeai/openinference-instrumentation-openai
+```
+
+```bash yarn
+yarn add @arizeai/openinference-instrumentation-openai
+```
+
+```bash pnpm
+pnpm add @arizeai/openinference-instrumentation-openai
+```
+</CodeGroup>
+
+## Common Features
+
+All OpenInference JavaScript instrumentations provide:
+
+- **Automatic Tracing**: Capture traces without modifying application code
+- **OpenTelemetry Compatible**: Works with standard OpenTelemetry infrastructure
+- **Context Propagation**: Automatically propagate session ID, user ID, metadata, and tags
+- **Data Masking**: Support for hiding sensitive inputs/outputs via trace configuration
+- **Custom Tracer Providers**: Ability to use non-global tracer providers
+- **TypeScript Support**: Full TypeScript type definitions included
+
+## Getting Started
+
+Most instrumentations follow a similar pattern:
+
+1. Install the instrumentation package
+2. Create a tracer provider
+3. Register the instrumentation
+4. Use your AI SDK normally
+
+Example:
+
+```typescript
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai";
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+
+const provider = new NodeTracerProvider();
+provider.register();
+
+registerInstrumentations({
+  instrumentations: [new OpenAIInstrumentation()],
+});
+
+// Now use OpenAI SDK as normal - traces will be captured automatically
+```
+
+## Resources
+
+- [GitHub Repository](https://github.com/Arize-ai/openinference/tree/main/js/packages)
+- [OpenInference Specification](https://github.com/Arize-ai/openinference/tree/main/spec)
+- [OpenTelemetry Node.js Documentation](https://opentelemetry.io/docs/instrumentation/js/getting-started/nodejs/)

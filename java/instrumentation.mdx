@@ -1,0 +1,332 @@
+---
+title: Base Instrumentation
+description: OpenInference base instrumentation utilities for Java
+---
+
+The `openinference-instrumentation` package provides core utilities for instrumenting Java applications with OpenInference semantic conventions.
+
+## Installation
+
+```gradle
+implementation 'com.arize:openinference-instrumentation:0.1.1'
+```
+
+## OITracer
+
+The `OITracer` class is a wrapper around OpenTelemetry's `Tracer` that provides convenience methods for creating spans with OpenInference semantic conventions.
+
+### Package
+
+`com.arize.instrumentation.OITracer`
+
+### Basic Usage
+
+```java
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
+import com.arize.instrumentation.OITracer;
+
+// Get OpenTelemetry tracer
+Tracer otelTracer = GlobalOpenTelemetry.getTracer("my-application");
+
+// Create OITracer
+OITracer tracer = new OITracer(otelTracer);
+```
+
+### With TraceConfig
+
+```java
+import com.arize.instrumentation.OITracer;
+import com.arize.instrumentation.TraceConfig;
+
+// Create tracer with custom configuration
+TraceConfig config = TraceConfig.builder()
+    .hideInputMessages(true)
+    .hideOutputMessages(false)
+    .build();
+
+OITracer tracer = new OITracer(otelTracer, config);
+```
+
+### Creating Spans
+
+```java
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import com.arize.semconv.trace.SemanticConventions;
+
+// Create a span
+Span span = tracer.spanBuilder("chat")
+    .setSpanKind(SpanKind.CLIENT)
+    .startSpan();
+
+try {
+    // Set OpenInference attributes
+    span.setAttribute(
+        SemanticConventions.OPENINFERENCE_SPAN_KIND,
+        SemanticConventions.OpenInferenceSpanKind.LLM.getValue()
+    );
+    span.setAttribute(SemanticConventions.LLM_MODEL_NAME, "gpt-4");
+    span.setAttribute(SemanticConventions.LLM_PROVIDER, "openai");
+    
+    // Your LLM call here
+    String response = callLLM(prompt);
+    
+    // Set response attributes
+    span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_PROMPT, 150L);
+    span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_COMPLETION, 75L);
+} finally {
+    span.end();
+}
+```
+
+## TraceConfig
+
+The `TraceConfig` class allows you to configure what data is captured or hidden in traces, useful for privacy and compliance requirements.
+
+### Package
+
+`com.arize.instrumentation.TraceConfig`
+
+### Configuration Options
+
+```java
+import com.arize.instrumentation.TraceConfig;
+
+TraceConfig config = TraceConfig.builder()
+    // Hide all inputs
+    .hideInputs(false)
+    
+    // Hide all outputs
+    .hideOutputs(false)
+    
+    // Hide input messages
+    .hideInputMessages(false)
+    
+    // Hide output messages
+    .hideOutputMessages(false)
+    
+    // Hide input images
+    .hideInputImages(false)
+    
+    // Hide output images
+    .hideOutputImages(false)
+    
+    // Hide input text
+    .hideInputText(false)
+    
+    // Hide output text
+    .hideOutputText(false)
+    
+    // Hide input audio
+    .hideInputAudio(false)
+    
+    // Hide output audio
+    .hideOutputAudio(false)
+    
+    // Hide input embeddings
+    .hideInputEmbeddings(false)
+    
+    // Hide output embeddings
+    .hideOutputEmbeddings(false)
+    
+    // Hide prompt templates
+    .hidePromptTemplate(false)
+    
+    // Hide prompt template variables
+    .hidePromptTemplateVariables(false)
+    
+    // Hide prompt template version
+    .hidePromptTemplateVersion(false)
+    
+    // Hide tool parameters
+    .hideToolParameters(false)
+    
+    // Base64 image max length ("unlimited" or numeric string)
+    .base64ImageMaxLength("unlimited")
+    
+    .build();
+```
+
+### Default Configuration
+
+```java
+// Get default configuration (nothing hidden)
+TraceConfig defaultConfig = TraceConfig.getDefault();
+```
+
+### Example: Privacy-Focused Configuration
+
+```java
+// Configuration for maximum privacy
+TraceConfig privateConfig = TraceConfig.builder()
+    .hideInputMessages(true)
+    .hideOutputMessages(true)
+    .hideInputImages(true)
+    .hideOutputImages(true)
+    .hidePromptTemplateVariables(true)
+    .build();
+
+OITracer tracer = new OITracer(otelTracer, privateConfig);
+```
+
+### Example: Hide Only User Inputs
+
+```java
+// Hide user inputs but keep outputs for debugging
+TraceConfig config = TraceConfig.builder()
+    .hideInputMessages(true)
+    .hideInputText(true)
+    .hideInputImages(true)
+    .hideInputAudio(true)
+    .build();
+```
+
+## Manual Instrumentation Example
+
+Here's a complete example of manually instrumenting an LLM call:
+
+```java
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
+import com.arize.instrumentation.OITracer;
+import com.arize.instrumentation.TraceConfig;
+import com.arize.semconv.trace.SemanticConventions;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.*;
+
+public class LLMClient {
+    private final OITracer tracer;
+    private final ObjectMapper mapper = new ObjectMapper();
+    
+    public LLMClient() {
+        Tracer otelTracer = GlobalOpenTelemetry.getTracer("llm-client");
+        this.tracer = new OITracer(otelTracer);
+    }
+    
+    public String chat(String userMessage) throws Exception {
+        Span span = tracer.spanBuilder("chat")
+            .setSpanKind(SpanKind.CLIENT)
+            .startSpan();
+        
+        try (Scope scope = span.makeCurrent()) {
+            // Set span kind
+            span.setAttribute(
+                SemanticConventions.OPENINFERENCE_SPAN_KIND,
+                SemanticConventions.OpenInferenceSpanKind.LLM.getValue()
+            );
+            
+            // Set model information
+            span.setAttribute(SemanticConventions.LLM_MODEL_NAME, "gpt-4");
+            span.setAttribute(SemanticConventions.LLM_PROVIDER, "openai");
+            span.setAttribute(SemanticConventions.LLM_SYSTEM, "openai");
+            
+            // Set input messages
+            List<Map<String, String>> messages = List.of(
+                Map.of("role", "user", "content", userMessage)
+            );
+            span.setAttribute(
+                SemanticConventions.INPUT_VALUE,
+                mapper.writeValueAsString(messages)
+            );
+            span.setAttribute(
+                SemanticConventions.INPUT_MIME_TYPE,
+                "application/json"
+            );
+            
+            // Set invocation parameters
+            Map<String, Object> params = Map.of(
+                "temperature", 0.7,
+                "max_tokens", 1000
+            );
+            span.setAttribute(
+                SemanticConventions.LLM_INVOCATION_PARAMETERS,
+                mapper.writeValueAsString(params)
+            );
+            
+            // Call LLM (replace with actual implementation)
+            String response = callOpenAI(userMessage);
+            
+            // Set output
+            List<Map<String, String>> responseMessages = List.of(
+                Map.of("role", "assistant", "content", response)
+            );
+            span.setAttribute(
+                SemanticConventions.OUTPUT_VALUE,
+                mapper.writeValueAsString(responseMessages)
+            );
+            span.setAttribute(
+                SemanticConventions.OUTPUT_MIME_TYPE,
+                "application/json"
+            );
+            
+            // Set token counts
+            span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_PROMPT, 150L);
+            span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_COMPLETION, 75L);
+            span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_TOTAL, 225L);
+            
+            span.setStatus(StatusCode.OK);
+            return response;
+            
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR, e.getMessage());
+            throw e;
+        } finally {
+            span.end();
+        }
+    }
+    
+    private String callOpenAI(String message) {
+        // Implement actual OpenAI API call
+        return "This is a response from GPT-4";
+    }
+}
+```
+
+## Integration with OpenTelemetry
+
+OITracer works seamlessly with OpenTelemetry's context propagation:
+
+```java
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Context;
+
+// Parent span
+Span parentSpan = tracer.spanBuilder("parent-operation")
+    .startSpan();
+
+try (Scope scope = parentSpan.makeCurrent()) {
+    // Child span automatically inherits context
+    Span childSpan = tracer.spanBuilder("child-operation")
+        .startSpan();
+    
+    try {
+        // Child operation
+    } finally {
+        childSpan.end();
+    }
+} finally {
+    parentSpan.end();
+}
+```
+
+## Dependencies
+
+The base instrumentation package depends on:
+
+- OpenTelemetry API (1.49.0)
+- OpenTelemetry SDK (1.49.0)
+- OpenTelemetry Instrumentation API
+- OpenInference Semantic Conventions
+- Jackson for JSON handling
+- SLF4J for logging
+
+## Next Steps
+
+- Explore [Semantic Conventions](/java/semantic-conventions)
+- Use auto-instrumentation with [Instrumentations](/java/instrumentations)

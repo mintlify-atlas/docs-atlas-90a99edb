@@ -1,0 +1,342 @@
+---
+title: Instrumentation Core
+description: Core utilities for manual tracing with OITracer, TraceConfig, and context managers
+---
+
+The `openinference-instrumentation` package provides utilities for manual instrumentation, trace configuration, and context propagation.
+
+## Installation
+
+```bash
+pip install openinference-instrumentation
+```
+
+## OITracer
+
+The `OITracer` class wraps an OpenTelemetry tracer with OpenInference-specific functionality, including support for `TraceConfig` masking and context attribute propagation.
+
+### Creating a Tracer
+
+```python
+from openinference.instrumentation import OITracer, TraceConfig
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+
+# Set up tracer provider
+tracer_provider = TracerProvider()
+trace.set_tracer_provider(tracer_provider)
+
+# Create OITracer with config
+config = TraceConfig()
+tracer = OITracer(
+    tracer_provider.get_tracer(__name__),
+    config=config
+)
+```
+
+### Manual Span Creation
+
+```python
+from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+# Start a span
+with tracer.start_as_current_span(
+    "my-operation",
+    openinference_span_kind=OpenInferenceSpanKindValues.CHAIN,
+) as span:
+    span.set_input(value="User question")
+    # ... do work ...
+    span.set_output(value="Response")
+```
+
+### Decorator-Based Tracing
+
+OITracer provides decorators for common span types:
+
+<CodeGroup>
+
+```python @tracer.chain
+from openinference.instrumentation import OITracer
+
+# Decorate a function as a chain
+@tracer.chain
+def process_query(query: str) -> str:
+    return query.upper()
+
+# With custom name
+@tracer.chain(name="QueryProcessor")
+def process_query(query: str) -> str:
+    return query.upper()
+```
+
+```python @tracer.agent
+# Decorate a function as an agent
+@tracer.agent
+def run_agent(task: str) -> str:
+    # Agent logic
+    return result
+
+# Async support
+@tracer.agent
+async def run_agent_async(task: str) -> str:
+    return await some_async_operation(task)
+```
+
+```python @tracer.tool
+# Decorate a function as a tool
+@tracer.tool
+def calculator(expression: str) -> float:
+    """Evaluates a mathematical expression."""
+    return eval(expression)
+
+# With parameters
+@tracer.tool(
+    name="math_eval",
+    description="Evaluates math expressions",
+    parameters={"type": "object", "properties": {...}}
+)
+def calculator(expression: str) -> float:
+    return eval(expression)
+```
+
+```python @tracer.llm
+# Decorate an LLM call
+@tracer.llm
+def call_llm(prompt: str) -> str:
+    return client.completions.create(prompt=prompt)
+
+# With custom processors
+@tracer.llm(
+    process_input=lambda prompt: {"llm.input_messages": [{"role": "user", "content": prompt}]},
+    process_output=lambda response: {"llm.output_messages": [{"role": "assistant", "content": response}]}
+)
+def call_llm(prompt: str) -> str:
+    return client.completions.create(prompt=prompt)
+
+# Streaming support
+@tracer.llm
+def stream_llm(prompt: str):
+    for chunk in client.completions.create(prompt=prompt, stream=True):
+        yield chunk
+```
+
+</CodeGroup>
+
+## TraceConfig
+
+The `TraceConfig` class controls data privacy and payload size in traces.
+
+```python
+from openinference.instrumentation import TraceConfig, REDACTED_VALUE
+
+config = TraceConfig(
+    hide_inputs=False,
+    hide_outputs=False,
+    hide_input_messages=False,
+    hide_output_messages=False,
+    hide_input_images=False,
+    hide_input_text=False,
+    hide_output_text=False,
+    hide_embedding_vectors=False,
+    hide_llm_invocation_parameters=False,
+    base64_image_max_length=32_000,
+)
+
+# Use with instrumentor
+from openinference.instrumentation.openai import OpenAIInstrumentor
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider, config=config)
+```
+
+### Configuration Options
+
+| Option | Description | Default |
+|--------|-------------|----------|
+| `hide_inputs` | Hide input values and messages | `False` |
+| `hide_outputs` | Hide output values and messages | `False` |
+| `hide_input_messages` | Hide all input messages | `False` |
+| `hide_output_messages` | Hide all output messages | `False` |
+| `hide_input_images` | Hide images from input messages | `False` |
+| `hide_input_text` | Hide text from input messages | `False` |
+| `hide_output_text` | Hide text from output messages | `False` |
+| `hide_embeddings_vectors` | Hide embedding vectors | `False` |
+| `hide_embeddings_text` | Hide embedding text | `False` |
+| `hide_llm_invocation_parameters` | Hide LLM parameters | `False` |
+| `base64_image_max_length` | Max base64 image length | `32000` |
+
+### Environment Variables
+
+Configuration can also be set via environment variables:
+
+```bash
+export OPENINFERENCE_HIDE_INPUTS=true
+export OPENINFERENCE_HIDE_OUTPUTS=true
+export OPENINFERENCE_BASE64_IMAGE_MAX_LENGTH=10000
+```
+
+When attributes are hidden, they are replaced with `"__REDACTED__"`.
+
+## Context Managers
+
+Context managers propagate attributes like session ID, user ID, metadata, and tags across all spans in a context.
+
+### using_session
+
+Track multi-turn conversations:
+
+```python
+from openinference.instrumentation import using_session
+
+with using_session("session-123"):
+    # All spans will include session.id = "session-123"
+    response = client.chat.completions.create(...)
+```
+
+### using_user
+
+Track user-specific traces:
+
+```python
+from openinference.instrumentation import using_user
+
+with using_user("user-456"):
+    # All spans will include user.id = "user-456"
+    response = client.chat.completions.create(...)
+```
+
+### using_metadata
+
+Add custom key-value metadata:
+
+```python
+from openinference.instrumentation import using_metadata
+
+metadata = {
+    "country": "United States",
+    "topic": "weather",
+    "priority": "high"
+}
+
+with using_metadata(metadata):
+    # All spans will include metadata as JSON
+    response = client.chat.completions.create(...)
+```
+
+### using_tags
+
+Add categorical tags for filtering:
+
+```python
+from openinference.instrumentation import using_tags
+
+tags = ["production", "business_critical", "english"]
+
+with using_tags(tags):
+    # All spans will include tag.tags = ["production", "business_critical", "english"]
+    response = client.chat.completions.create(...)
+```
+
+### using_prompt_template
+
+Track prompt templates with versions:
+
+```python
+from openinference.instrumentation import using_prompt_template
+
+with using_prompt_template(
+    template="Please describe the weather forecast for {city} on {date}",
+    version="v1.0",
+    variables={"city": "Johannesburg", "date": "July 11"}
+):
+    # All spans will include prompt template attributes
+    response = client.chat.completions.create(...)
+```
+
+### using_attributes
+
+Combine multiple context attributes:
+
+```python
+from openinference.instrumentation import using_attributes
+
+with using_attributes(
+    session_id="session-123",
+    user_id="user-456",
+    metadata={"country": "US", "topic": "weather"},
+    tags=["production", "critical"],
+    prompt_template="Forecast for {city}",
+    prompt_template_version="v2.0",
+    prompt_template_variables={"city": "NYC"}
+):
+    # All spans include all specified attributes
+    response = client.chat.completions.create(...)
+```
+
+## suppress_tracing
+
+Temporarily disable tracing:
+
+```python
+from openinference.instrumentation import suppress_tracing
+
+with suppress_tracing():
+    # No spans will be created in this block
+    internal_operation()
+```
+
+## Helper Functions
+
+### safe_json_dumps
+
+Safely serialize objects to JSON:
+
+```python
+from openinference.instrumentation import safe_json_dumps
+
+data = {"key": "value", "nested": {"items": [1, 2, 3]}}
+json_str = safe_json_dumps(data)
+```
+
+## Complete Example
+
+```python
+from openinference.instrumentation import (
+    OITracer,
+    TraceConfig,
+    using_attributes,
+    suppress_tracing,
+)
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+
+# Setup
+tracer_provider = TracerProvider()
+tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+trace.set_tracer_provider(tracer_provider)
+
+config = TraceConfig(hide_input_images=True)
+tracer = OITracer(tracer_provider.get_tracer(__name__), config=config)
+
+# Define traced functions
+@tracer.chain
+def process_request(query: str) -> str:
+    with suppress_tracing():
+        # Internal validation - not traced
+        validate_query(query)
+    
+    # This will be traced
+    return generate_response(query)
+
+@tracer.llm
+def generate_response(query: str) -> str:
+    return f"Response to: {query}"
+
+# Use with context
+with using_attributes(
+    session_id="demo-session",
+    user_id="demo-user",
+    tags=["example"]
+):
+    result = process_request("What is OpenInference?")
+    print(result)
+```

@@ -1,0 +1,93 @@
+---
+title: Installation
+description: Install OpenInference Python packages for tracing and instrumentation
+---
+
+## Requirements
+
+OpenInference requires Python 3.9 or higher (up to Python 3.14).
+
+## Core Packages
+
+<CodeGroup>
+
+```bash pip
+pip install openinference-instrumentation
+```
+
+```bash pip (semantic conventions)
+pip install openinference-semantic-conventions
+```
+
+</CodeGroup>
+
+## Instrumentation Packages
+
+Install instrumentation for your specific AI/ML framework:
+
+<CodeGroup>
+
+```bash OpenAI
+pip install openinference-instrumentation-openai
+```
+
+```bash LangChain
+pip install openinference-instrumentation-langchain
+```
+
+```bash LlamaIndex
+pip install openinference-instrumentation-llama-index
+```
+
+```bash Anthropic
+pip install openinference-instrumentation-anthropic
+```
+
+```bash DSPy
+pip install openinference-instrumentation-dspy
+```
+
+```bash Bedrock
+pip install openinference-instrumentation-bedrock
+```
+
+</CodeGroup>
+
+## Development Installation
+
+For development or contributing:
+
+<CodeGroup>
+
+```bash Install from source
+# Install tox for testing automation
+pip install tox-uv==1.11.2
+
+# Install development dependencies
+pip install -r python/dev-requirements.txt
+
+# Compose namespace package
+tox run -e add_symlinks
+
+# Install in editable mode
+pip install -e python/openinference-instrumentation
+```
+
+</CodeGroup>
+
+## Verify Installation
+
+Verify your installation:
+
+```python
+import openinference.instrumentation
+import openinference.semconv
+
+print(openinference.instrumentation.__version__)
+```
+
+## Next Steps
+
+- Learn about [Semantic Conventions](/python/semantic-conventions)
+- Explore [Instrumentation Core](/python/instrumentation-core)
+- Browse [Available Instrumentations](/python/instrumentations)

@@ -1,80 +1,482 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with OpenInference in 5 minutes. Install instrumentation, launch Phoenix, and start tracing your first LLM application.
 ---
 
-## Get started in three steps
+This guide will help you instrument your first AI application with OpenInference and visualize traces in Phoenix.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Choose your language:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+<Tabs>
+  <Tab title="Python">
+    - Python 3.9 or higher
+    - An OpenAI API key (or another LLM provider)
+  </Tab>
+  <Tab title="JavaScript">
+    - Node.js 18 or higher
+    - npm or yarn
+    - An OpenAI API key (or another LLM provider)
+  </Tab>
+  <Tab title="Java">
+    - Java 11 or higher
+    - Gradle or Maven
+  </Tab>
+</Tabs>
 
-### Step 2: Deploy your changes
+## Installation
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+<Steps>
+  <Step title="Install OpenInference instrumentation">
+    Install the OpenInference instrumentation library for your framework:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    <Tabs>
+      <Tab title="Python">
+        <CodeGroup>
+          ```bash pip
+          pip install openinference-instrumentation-openai "openai>=1.26" arize-phoenix opentelemetry-sdk opentelemetry-exporter-otlp
+          ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+          ```bash uv
+          uv pip install openinference-instrumentation-openai "openai>=1.26" arize-phoenix opentelemetry-sdk opentelemetry-exporter-otlp
+          ```
 
-### Step 3: Go live
+          ```bash poetry
+          poetry add openinference-instrumentation-openai "openai>=1.26" arize-phoenix opentelemetry-sdk opentelemetry-exporter-otlp
+          ```
+        </CodeGroup>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+        <Note>
+          Replace `openinference-instrumentation-openai` with the instrumentation for your framework:
+          - LangChain: `openinference-instrumentation-langchain`
+          - LlamaIndex: `openinference-instrumentation-llama-index`
+          - Anthropic: `openinference-instrumentation-anthropic`
+          - See [all Python instrumentations](/python)
+        </Note>
+      </Tab>
+
+      <Tab title="JavaScript">
+        <CodeGroup>
+          ```bash npm
+          npm install --save @arizeai/openinference-instrumentation-openai @opentelemetry/sdk-trace-node @opentelemetry/exporter-trace-otlp-http @opentelemetry/resources @opentelemetry/instrumentation openai
+          ```
+
+          ```bash yarn
+          yarn add @arizeai/openinference-instrumentation-openai @opentelemetry/sdk-trace-node @opentelemetry/exporter-trace-otlp-http @opentelemetry/resources @opentelemetry/instrumentation openai
+          ```
+
+          ```bash pnpm
+          pnpm add @arizeai/openinference-instrumentation-openai @opentelemetry/sdk-trace-node @opentelemetry/exporter-trace-otlp-http @opentelemetry/resources @opentelemetry/instrumentation openai
+          ```
+        </CodeGroup>
+
+        <Note>
+          Replace `@arizeai/openinference-instrumentation-openai` with the instrumentation for your framework:
+          - LangChain: `@arizeai/openinference-instrumentation-langchain`
+          - Anthropic: `@arizeai/openinference-instrumentation-anthropic`
+          - Bedrock: `@arizeai/openinference-instrumentation-bedrock`
+          - See [all JavaScript instrumentations](/javascript)
+        </Note>
+      </Tab>
+
+      <Tab title="Java">
+        **Gradle:**
+        ```gradle
+        dependencies {
+            implementation 'com.arize:openinference-instrumentation-langchain4j:0.1.+'
+            implementation 'io.opentelemetry:opentelemetry-api:1.49.0'
+            implementation 'io.opentelemetry:opentelemetry-sdk:1.49.0'
+            implementation 'io.opentelemetry:opentelemetry-exporter-otlp:1.49.0'
+        }
+        ```
+
+        **Maven:**
+        ```xml
+        <dependencies>
+            <dependency>
+                <groupId>com.arize</groupId>
+                <artifactId>openinference-instrumentation-langchain4j</artifactId>
+                <version>0.1.+</version>
+            </dependency>
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-api</artifactId>
+                <version>1.49.0</version>
+            </dependency>
+        </dependencies>
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Start Phoenix server">
+    Phoenix is an open-source AI observability platform that runs entirely on your machine. Start the server to collect traces:
+
+    <Tabs>
+      <Tab title="Python">
+        ```bash
+        python -m phoenix.server.main serve
+        ```
+
+        Phoenix will start on `http://localhost:6006`. Open this URL in your browser.
+      </Tab>
+
+      <Tab title="JavaScript">
+        ```bash
+        python -m phoenix.server.main serve
+        ```
+
+        Phoenix will start on `http://localhost:6006`. Open this URL in your browser.
+
+        <Note>
+          Phoenix requires Python even when instrumenting JavaScript apps. Install it with `pip install arize-phoenix`.
+        </Note>
+      </Tab>
+
+      <Tab title="Java">
+        ```bash
+        python -m phoenix.server.main serve
+        ```
+
+        Phoenix will start on `http://localhost:6006`. Open this URL in your browser.
+
+        <Note>
+          Phoenix requires Python. Install it with `pip install arize-phoenix`.
+        </Note>
+      </Tab>
+    </Tabs>
+
+    <Tip>
+      The Phoenix server does not send data over the internet — all traces stay on your machine.
+    </Tip>
+  </Step>
+
+  <Step title="Set your API key">
+    Set your OpenAI API key as an environment variable:
+
+    <CodeGroup>
+      ```bash macOS/Linux
+      export OPENAI_API_KEY="your-api-key-here"
+      ```
+
+      ```powershell Windows
+      $env:OPENAI_API_KEY="your-api-key-here"
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Instrument your application">
+    Create a file with the following code to instrument your first LLM call:
+
+    <Tabs>
+      <Tab title="Python">
+        Create `app.py`:
+
+        ```python app.py
+        import openai
+        from openinference.instrumentation.openai import OpenAIInstrumentor
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+        from opentelemetry.sdk import trace as trace_sdk
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+        # Configure OpenTelemetry to send traces to Phoenix
+        endpoint = "http://127.0.0.1:6006/v1/traces"
+        tracer_provider = trace_sdk.TracerProvider()
+        tracer_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter(endpoint)))
+
+        # Instrument OpenAI
+        OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+
+        if __name__ == "__main__":
+            # Make an OpenAI call - it will be automatically traced
+            client = openai.OpenAI()
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Write a haiku about observability."}],
+                max_tokens=50,
+            )
+            print(response.choices[0].message.content)
+        ```
+
+        Run the application:
+        ```bash
+        python app.py
+        ```
+      </Tab>
+
+      <Tab title="JavaScript">
+        Create `instrumentation.js`:
+
+        ```javascript instrumentation.js
+        const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
+        const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
+        const { SimpleSpanProcessor } = require('@opentelemetry/sdk-trace-node');
+        const { OpenAIInstrumentation } = require('@arizeai/openinference-instrumentation-openai');
+        const { registerInstrumentations } = require('@opentelemetry/instrumentation');
+
+        // Configure OpenTelemetry to send traces to Phoenix
+        const provider = new NodeTracerProvider();
+        provider.addSpanProcessor(
+          new SimpleSpanProcessor(
+            new OTLPTraceExporter({
+              url: 'http://127.0.0.1:6006/v1/traces',
+            })
+          )
+        );
+        provider.register();
+
+        // Register OpenAI instrumentation
+        registerInstrumentations({
+          instrumentations: [new OpenAIInstrumentation()],
+        });
+        ```
+
+        Create `app.js`:
+
+        ```javascript app.js
+        const OpenAI = require('openai');
+
+        const client = new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY,
+        });
+
+        async function main() {
+          const response = await client.chat.completions.create({
+            model: 'gpt-3.5-turbo',
+            messages: [{ role: 'user', content: 'Write a haiku about observability.' }],
+            max_tokens: 50,
+          });
+          console.log(response.choices[0].message.content);
+        }
+
+        main();
+        ```
+
+        Run the application:
+        ```bash
+        node -r ./instrumentation.js app.js
+        ```
+
+        <Warning>
+          The instrumentation file must be required before your application code runs. Use the `-r` flag to ensure it loads first.
+        </Warning>
+      </Tab>
+
+      <Tab title="Java">
+        Create `Main.java`:
+
+        ```java Main.java
+        import io.openinference.instrumentation.langchain4j.LangChain4jInstrumentor;
+        import io.opentelemetry.api.GlobalOpenTelemetry;
+        import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter;
+        import io.opentelemetry.sdk.OpenTelemetrySdk;
+        import io.opentelemetry.sdk.trace.SdkTracerProvider;
+        import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
+        import dev.langchain4j.model.openai.OpenAiChatModel;
+
+        public class Main {
+            public static void main(String[] args) {
+                // Configure OpenTelemetry to send traces to Phoenix
+                SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
+                    .addSpanProcessor(
+                        SimpleSpanProcessor.create(
+                            OtlpHttpSpanExporter.builder()
+                                .setEndpoint("http://127.0.0.1:6006/v1/traces")
+                                .build()
+                        )
+                    )
+                    .build();
+
+                OpenTelemetrySdk.builder()
+                    .setTracerProvider(tracerProvider)
+                    .buildAndRegisterGlobal();
+
+                // Auto-instrument LangChain4j
+                LangChain4jInstrumentor.instrument();
+
+                // Make an LLM call - it will be automatically traced
+                OpenAiChatModel model = OpenAiChatModel.builder()
+                    .apiKey(System.getenv("OPENAI_API_KEY"))
+                    .modelName("gpt-3.5-turbo")
+                    .build();
+
+                String response = model.generate("Write a haiku about observability.");
+                System.out.println(response);
+            }
+        }
+        ```
+
+        Run the application:
+        ```bash
+        ./gradlew run
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="View traces in Phoenix">
+    Open Phoenix in your browser at `http://localhost:6006`. You'll see:
+
+    - **Traces view**: All LLM calls with timing, token counts, and costs
+    - **Span details**: Input messages, output messages, model parameters
+    - **Timeline**: Visual representation of the execution flow
+
+    <Frame>
+      <img src="https://raw.githubusercontent.com/Arize-ai/phoenix-assets/main/images/trace_details.png" alt="Phoenix trace details" />
+    </Frame>
+  </Step>
+</Steps>
+
+## What's captured?
+
+OpenInference automatically captures:
+
+<CardGroup cols={2}>
+  <Card title="Messages" icon="messages">
+    Full conversation history including system prompts, user messages, and assistant responses
+  </Card>
+  <Card title="Token counts" icon="hashtag">
+    Prompt tokens, completion tokens, cached tokens, and reasoning tokens
+  </Card>
+  <Card title="Model parameters" icon="sliders">
+    Temperature, max tokens, top-p, and other invocation parameters
+  </Card>
+  <Card title="Costs" icon="dollar-sign">
+    Estimated costs for prompt and completion tokens in USD
+  </Card>
+  <Card title="Timing" icon="clock">
+    Start time, end time, and duration with nanosecond precision
+  </Card>
+  <Card title="Errors" icon="triangle-exclamation">
+    Exception messages and stack traces when calls fail
+  </Card>
+</CardGroup>
+
+## Advanced example with context
+
+Add session tracking, user IDs, and custom metadata to your traces:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    from openinference.instrumentation import using_attributes
+
+    with using_attributes(
+        session_id="user-session-123",
+        user_id="user-456",
+        metadata={
+            "environment": "production",
+            "version": "1.0.0",
+        },
+        tags=["chat", "customer-support"],
+    ):
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": "How do I reset my password?"}],
+        )
+    ```
+  </Tab>
+
+  <Tab title="JavaScript">
+    ```javascript
+    const { context, trace } = require('@opentelemetry/api');
+    const { SemanticAttributes } = require('@arizeai/openinference-semantic-conventions');
+
+    const span = trace.getTracer('my-app').startSpan('chat');
+    span.setAttribute(SemanticAttributes.SESSION_ID, 'user-session-123');
+    span.setAttribute(SemanticAttributes.USER_ID, 'user-456');
+    span.setAttribute(SemanticAttributes.METADATA, JSON.stringify({
+      environment: 'production',
+      version: '1.0.0',
+    }));
+    span.setAttribute(SemanticAttributes.TAG_TAGS, JSON.stringify(['chat', 'customer-support']));
+
+    context.with(trace.setSpan(context.active(), span), async () => {
+      const response = await client.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: 'How do I reset my password?' }],
+      });
+      span.end();
+    });
+    ```
+  </Tab>
+
+  <Tab title="Java">
+    ```java
+    import io.opentelemetry.api.trace.Span;
+    import io.openinference.semconv.trace.SpanAttributes;
+
+    Span span = GlobalOpenTelemetry.getTracer("my-app").spanBuilder("chat").startSpan();
+    span.setAttribute(SpanAttributes.SESSION_ID, "user-session-123");
+    span.setAttribute(SpanAttributes.USER_ID, "user-456");
+    span.setAttribute(SpanAttributes.METADATA, "{\"environment\": \"production\", \"version\": \"1.0.0\"}");
+
+    try {
+        String response = model.generate("How do I reset my password?");
+        System.out.println(response);
+    } finally {
+        span.end();
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Streaming example
+
+OpenInference supports streaming LLM responses:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": "Write a story about AI."}],
+        stream=True,
+        stream_options={"include_usage": True},  # Required for token counts
+    )
+
+    for chunk in response:
+        if chunk.choices and (content := chunk.choices[0].delta.content):
+            print(content, end="")
+    ```
+
+    <Note>
+      Set `stream_options={"include_usage": True}` to capture token counts when streaming (requires `openai>=1.26`).
+    </Note>
+  </Tab>
+
+  <Tab title="JavaScript">
+    ```javascript
+    const stream = await client.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: 'Write a story about AI.' }],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content;
+      if (content) {
+        process.stdout.write(content);
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Python instrumentations" icon="python" href="/python">
+    Explore all 30+ Python instrumentation libraries
+  </Card>
+  <Card title="JavaScript instrumentations" icon="js" href="/javascript">
+    Explore JavaScript/TypeScript instrumentations
+  </Card>
+  <Card title="Privacy controls" icon="shield-halved" href="/tracing/privacy">
+    Configure data masking and PII protection
+  </Card>
+  <Card title="Production deployment" icon="rocket" href="/deployment">
+    Deploy OpenInference in production with OTLP collectors
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

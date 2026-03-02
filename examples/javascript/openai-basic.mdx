@@ -1,0 +1,221 @@
+---
+title: OpenAI Basic Usage
+description: Instrument OpenAI SDK in Node.js with OpenInference
+---
+
+This example demonstrates how to instrument the OpenAI JavaScript/TypeScript SDK with OpenInference tracing.
+
+## Prerequisites
+
+- Node.js 18+
+- OpenAI API key
+- Phoenix or another OpenTelemetry collector running
+
+## Installation
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    npm install openai \
+      @arizeai/openinference-instrumentation-openai \
+      @opentelemetry/sdk-trace-node \
+      @opentelemetry/exporter-trace-otlp-proto
+    ```
+  </Step>
+
+  <Step title="Set environment variables">
+    ```bash
+    export OPENAI_API_KEY="your-api-key"
+    ```
+  </Step>
+</Steps>
+
+## Instrumentation Setup
+
+Create an `instrumentation.ts` file:
+
+```typescript
+import { SEMRESATTRS_PROJECT_NAME } from "@arizeai/openinference-semantic-conventions";
+import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+import { Resource } from "@opentelemetry/resources";
+import { ConsoleSpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai";
+
+// For troubleshooting, set the log level to DiagLogLevel.DEBUG
+diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
+
+const provider = new NodeTracerProvider({
+  resource: new Resource({
+    [SEMRESATTRS_PROJECT_NAME]: "openai-service",
+  }),
+  spanProcessors: [
+    new SimpleSpanProcessor(new ConsoleSpanExporter()),
+    new SimpleSpanProcessor(
+      new OTLPTraceExporter({
+        url: "http://localhost:6006/v1/traces",
+      }),
+    ),
+  ],
+});
+
+registerInstrumentations({
+  instrumentations: [new OpenAIInstrumentation()],
+});
+
+provider.register();
+
+console.log("👀 OpenInference initialized");
+```
+
+## Complete Example
+
+Create a `chat.ts` file:
+
+```typescript
+import "./instrumentation";
+import { isPatched } from "@arizeai/openinference-instrumentation-openai";
+import OpenAI from "openai";
+
+// Check if OpenAI has been patched
+if (!isPatched()) {
+  throw new Error("OpenAI instrumentation failed");
+}
+
+// Initialize OpenAI
+const openai = new OpenAI();
+
+openai.chat.completions
+  .create({
+    model: "gpt-3.5-turbo",
+    messages: [{ role: "system", content: "You are a helpful assistant." }],
+    max_tokens: 150,
+    temperature: 0.5,
+  })
+  .then((response) => {
+    console.log(response.choices[0].message.content);
+  });
+```
+
+Run the example:
+
+```bash
+npx tsx chat.ts
+```
+
+## Streaming Example
+
+```typescript
+import "./instrumentation";
+import OpenAI from "openai";
+
+const openai = new OpenAI();
+
+async function streamCompletion() {
+  const stream = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [{ role: "user", content: "Write a short poem about code." }],
+    stream: true,
+  });
+
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content || "";
+    process.stdout.write(content);
+  }
+  console.log("\n");
+}
+
+streamCompletion();
+```
+
+## Function Calling Example
+
+```typescript
+import "./instrumentation";
+import OpenAI from "openai";
+
+const openai = new OpenAI();
+
+const tools = [
+  {
+    type: "function" as const,
+    function: {
+      name: "get_current_weather",
+      description: "Get the current weather in a given location",
+      parameters: {
+        type: "object",
+        properties: {
+          location: {
+            type: "string",
+            description: "The city and state, e.g. San Francisco, CA",
+          },
+          unit: { type: "string", enum: ["celsius", "fahrenheit"] },
+        },
+        required: ["location"],
+      },
+    },
+  },
+];
+
+async function runFunctionCall() {
+  const response = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [{ role: "user", content: "What's the weather in Boston?" }],
+    tools: tools,
+    tool_choice: "auto",
+  });
+
+  const toolCall = response.choices[0].message.tool_calls?.[0];
+  if (toolCall) {
+    console.log("Function called:", toolCall.function.name);
+    console.log("Arguments:", toolCall.function.arguments);
+  }
+}
+
+runFunctionCall();
+```
+
+## Key Features
+
+### Automatic Instrumentation
+
+The OpenAI instrumentation automatically traces:
+- **Chat completions**: Standard and streaming responses
+- **Embeddings**: Text embedding generation
+- **Function calling**: Tool use and execution
+- **Vision**: Image inputs with multimodal models
+
+### Manual Instrumentation Check
+
+Use `isPatched()` to verify instrumentation is active:
+
+```typescript
+import { isPatched } from "@arizeai/openinference-instrumentation-openai";
+
+if (!isPatched()) {
+  console.warn("OpenAI not instrumented");
+}
+```
+
+### Resource Attributes
+
+Add project metadata:
+
+```typescript
+import { SEMRESATTRS_PROJECT_NAME } from "@arizeai/openinference-semantic-conventions";
+
+const provider = new NodeTracerProvider({
+  resource: new Resource({
+    [SEMRESATTRS_PROJECT_NAME]: "my-app",
+    "service.version": "1.0.0",
+  }),
+});
+```
+
+## Next Steps
+
+- Learn about [Next.js integration](/examples/javascript/nextjs-openai)
+- Explore [LangChain with Express](/examples/javascript/langchain-express)
+- See [trace configuration](/concepts/trace-config)

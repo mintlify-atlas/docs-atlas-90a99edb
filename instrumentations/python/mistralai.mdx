@@ -1,0 +1,92 @@
+---
+title: Mistral AI
+description: Python auto-instrumentation for Mistral AI SDK
+---
+
+Python autoinstrumentation library for MistralAI's Python SDK.
+
+The traces emitted by this instrumentation are fully OpenTelemetry compatible and can be sent to an OpenTelemetry collector for viewing, such as [Arize Phoenix](https://github.com/Arize-ai/phoenix).
+
+## Installation
+
+```bash
+pip install openinference-instrumentation-mistralai
+```
+
+## Quickstart
+
+This example shows how to instrument a program that uses the MistralAI chat completions API and observe the traces via [Arize Phoenix](https://github.com/Arize-ai/phoenix).
+
+Install packages:
+
+```bash
+pip install openinference-instrumentation-mistralai mistralai arize-phoenix opentelemetry-sdk opentelemetry-exporter-otlp
+```
+
+### Start Phoenix server
+
+Start the phoenix server so that it is ready to collect traces. The Phoenix server runs entirely on your machine and does not send data over the internet.
+
+```bash
+python -m phoenix.server.main serve
+```
+
+### Setup instrumentation
+
+In a python file, setup the `MistralAIInstrumentor` and configure the tracer to send traces to Phoenix:
+
+```python
+from mistralai.client import MistralClient
+from mistralai.models.chat_completion import ChatMessage
+from openinference.instrumentation.mistralai import MistralAIInstrumentor
+from opentelemetry import trace as trace_api
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+
+endpoint = "http://127.0.0.1:6006/v1/traces"
+tracer_provider = trace_sdk.TracerProvider()
+tracer_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter(endpoint)))
+# Optionally, you can also print the spans to the console.
+tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+trace_api.set_tracer_provider(tracer_provider)
+
+MistralAIInstrumentor().instrument()
+
+
+if __name__ == "__main__":
+    client = MistralClient()
+    response = client.chat(
+        model="mistral-large-latest",
+        messages=[
+            ChatMessage(
+                content="Who won the World Cup in 2018?",
+                role="user",
+            )
+        ],
+    )
+    print(response.choices[0].message.content)
+```
+
+### Set API key
+
+Set the `MISTRAL_API_KEY` environment variable to authenticate with the MistralAI API:
+
+```bash
+export MISTRAL_API_KEY=[your_key_here]
+```
+
+### Run your application
+
+```bash
+python your_file.py
+```
+
+Visit the Phoenix app at `http://localhost:6006` to see your traces.
+
+## More Info
+
+- [OpenInference and Phoenix documentation](https://docs.arize.com/phoenix)
+- [How to customize spans to track sessions, metadata, etc.](https://github.com/Arize-ai/openinference/tree/main/python/openinference-instrumentation#customizing-spans)
+- [How to account for private information and span payload customization](https://github.com/Arize-ai/openinference/tree/main/python/openinference-instrumentation#tracing-configuration)
+- [PyPI package](https://pypi.org/project/openinference-instrumentation-mistralai/)

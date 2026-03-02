@@ -1,0 +1,134 @@
+---
+title: OpenInference Overview
+description: Introduction to OpenInference data model and architecture
+---
+
+OpenInference is a semantic convention specification for AI application observability, built on [OpenTelemetry](https://opentelemetry.io/). It standardizes how LLM calls, agent reasoning steps, tool invocations, retrieval operations, and other AI-specific workloads are represented as distributed traces.
+
+## Why OpenInference?
+
+OpenTelemetry defines a universal wire format and SDK model for distributed tracing, but its attribute model is intentionally generic. AI applications present a distinct set of observability requirements that general-purpose conventions do not address:
+
+<AccordionGroup>
+  <Accordion title="Structured inputs and outputs">
+    LLM calls carry multi-turn message arrays, system prompts, tool definitions, and multimodal content. A single string `input.value` is insufficient for capturing the complexity of AI application data flows.
+  </Accordion>
+
+  <Accordion title="Token economics">
+    Prompt and completion token counts, along with cached and reasoning token breakdowns, are first-class operational metrics for AI applications, not afterthoughts.
+  </Accordion>
+
+  <Accordion title="Agentic control flow">
+    Modern AI systems route through reasoning loops, delegate to sub-agents, invoke tools, and query retrieval systems. Each hop needs a consistent identity and span-kind taxonomy for the trace to be interpretable.
+  </Accordion>
+
+  <Accordion title="Privacy sensitivity">
+    Prompts and completions frequently contain personal information and must be maskable before export, with per-field granularity.
+  </Accordion>
+
+  <Accordion title="Nondeterminism">
+    LLM outputs are stochastic. Traces must carry enough context to reproduce—or at least explain—a particular execution.
+  </Accordion>
+</AccordionGroup>
+
+## How It Works
+
+OpenInference solves these problems by defining a concrete attribute schema and span-kind taxonomy on top of OpenTelemetry spans. **Every OpenInference trace is a valid OTLP trace**—the conventions give attribute names their AI-specific meaning.
+
+<Note>
+  OpenInference extends OpenTelemetry without modifying it. Any system that can ingest OTLP traces can receive OpenInference traces.
+</Note>
+
+## Core Concepts
+
+OpenInference is built on three fundamental concepts:
+
+### Traces
+
+A **trace** records the full execution path of a request—from the user's initial input through every LLM call, tool invocation, and retrieval step to the final response. Traces are trees of spans connected by parent–child relationships. The root span typically represents an agent turn or pipeline invocation; child spans represent individual operations within it.
+
+<Card title="Learn about traces" icon="diagram-project" href="/concepts/traces">
+  Understand trace structure, hierarchy, and context propagation
+</Card>
+
+### Spans
+
+A **span** is the atomic unit of work: one LLM call, one tool execution, one retrieval query, one embedding generation. Every span carries structured metadata including timestamps, status, and typed attributes.
+
+<Card title="Learn about spans" icon="cube" href="/concepts/spans">
+  Explore span anatomy, timestamps, status codes, and events
+</Card>
+
+### Attributes
+
+Attributes are typed key-value pairs attached to spans following a structured naming convention. They are the primary payload of OpenInference: they carry the prompt, the response, the model name, the retrieved documents, the tool arguments, and everything else needed to understand and reproduce a given execution.
+
+<Card title="Learn about attributes" icon="tags" href="/concepts/attributes">
+  Understand attribute naming conventions and semantic conventions
+</Card>
+
+## Span Kinds
+
+The `openinference.span.kind` attribute classifies what an operation does, enabling observability platforms to render traces with AI-aware visualizations and aggregations.
+
+<CardGroup cols={2}>
+  <Card title="LLM" icon="brain">
+    A call to a language model API (OpenAI, Anthropic, etc.)
+  </Card>
+  <Card title="AGENT" icon="robot">
+    A reasoning step in an autonomous agent
+  </Card>
+  <Card title="CHAIN" icon="link">
+    A sequence of operations or orchestration logic
+  </Card>
+  <Card title="TOOL" icon="wrench">
+    Execution of a function or external API
+  </Card>
+  <Card title="RETRIEVER" icon="database">
+    A query to a vector store or search engine
+  </Card>
+  <Card title="RERANKER" icon="arrow-down-1-9">
+    Reordering documents by relevance
+  </Card>
+  <Card title="EMBEDDING" icon="vector-square">
+    Generation of vector embeddings
+  </Card>
+  <Card title="GUARDRAIL" icon="shield-halved">
+    Input or output moderation check
+  </Card>
+  <Card title="EVALUATOR" icon="clipboard-check">
+    Automated evaluation of model responses
+  </Card>
+  <Card title="PROMPT" icon="file-lines">
+    Prompt template rendering
+  </Card>
+</CardGroup>
+
+<Card title="Explore span kinds" icon="list" href="/concepts/span-kinds">
+  Detailed documentation for all span kinds
+</Card>
+
+## Compliance
+
+The keywords "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in the OpenInference specification are to be interpreted as described in [BCP 14](https://tools.ietf.org/html/bcp14) [[RFC2119](https://tools.ietf.org/html/rfc2119)] [[RFC8174](https://tools.ietf.org/html/rfc8174)].
+
+<Info>
+  An implementation is **compliant** if it satisfies all "MUST", "MUST NOT", "REQUIRED", "SHALL", and "SHALL NOT" requirements defined in the specification.
+</Info>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Traces" icon="diagram-project" href="/concepts/traces">
+    Learn how traces represent request execution paths
+  </Card>
+  <Card title="Spans" icon="cube" href="/concepts/spans">
+    Understand the atomic units of work
+  </Card>
+  <Card title="Span Kinds" icon="list" href="/concepts/span-kinds">
+    Explore all available span kinds
+  </Card>
+  <Card title="Attributes" icon="tags" href="/concepts/attributes">
+    Master attribute naming conventions
+  </Card>
+</CardGroup>

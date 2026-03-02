@@ -1,0 +1,396 @@
+---
+title: Java Instrumentations
+description: Complete list of OpenInference Java instrumentation packages
+---
+
+OpenInference provides Java instrumentation packages for popular AI frameworks and libraries. All packages are built on OpenTelemetry and follow the OpenInference semantic conventions.
+
+## Available Instrumentations
+
+<table>
+  <thead>
+    <tr>
+      <th>Framework</th>
+      <th>Package Name</th>
+      <th>Version</th>
+      <th>Maven Central</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><a href="/instrumentations/java/langchain4j">LangChain4j</a></td>
+      <td><code>openinference-instrumentation-langchain4j</code></td>
+      <td>0.1.5</td>
+      <td><a href="https://central.sonatype.com/artifact/com.arize/openinference-instrumentation-langchain4j" target="_blank">View on Maven Central</a></td>
+    </tr>
+    <tr>
+      <td><a href="/instrumentations/java/spring-ai">Spring AI</a></td>
+      <td><code>openinference-instrumentation-springAI</code></td>
+      <td>0.1.0</td>
+      <td><a href="https://central.sonatype.com/artifact/com.arize/openinference-instrumentation-springAI" target="_blank">View on Maven Central</a></td>
+    </tr>
+  </tbody>
+</table>
+
+## Core Packages
+
+In addition to framework-specific instrumentations, OpenInference provides core packages:
+
+<table>
+  <thead>
+    <tr>
+      <th>Package</th>
+      <th>Description</th>
+      <th>Version</th>
+      <th>Maven Central</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>openinference-semantic-conventions</code></td>
+      <td>Java constants for OpenInference semantic conventions</td>
+      <td>0.1.1</td>
+      <td><a href="https://central.sonatype.com/artifact/com.arize/openinference-semantic-conventions" target="_blank">View on Maven Central</a></td>
+    </tr>
+    <tr>
+      <td><code>openinference-instrumentation</code></td>
+      <td>Base instrumentation utilities and OITracer</td>
+      <td>0.1.1</td>
+      <td><a href="https://central.sonatype.com/artifact/com.arize/openinference-instrumentation" target="_blank">View on Maven Central</a></td>
+    </tr>
+  </tbody>
+</table>
+
+## Installation
+
+### Gradle
+
+Add the desired instrumentation to your `build.gradle`:
+
+```gradle
+dependencies {
+    // For LangChain4j
+    implementation 'com.arize:openinference-instrumentation-langchain4j:0.1.5'
+    
+    // For Spring AI
+    implementation 'com.arize:openinference-instrumentation-springAI:0.1.0'
+    
+    // Core packages (usually included as transitive dependencies)
+    implementation 'com.arize:openinference-semantic-conventions:0.1.1'
+    implementation 'com.arize:openinference-instrumentation:0.1.1'
+}
+```
+
+### Maven
+
+Add the desired instrumentation to your `pom.xml`:
+
+```xml
+<dependencies>
+    <!-- For LangChain4j -->
+    <dependency>
+        <groupId>com.arize</groupId>
+        <artifactId>openinference-instrumentation-langchain4j</artifactId>
+        <version>0.1.5</version>
+    </dependency>
+    
+    <!-- For Spring AI -->
+    <dependency>
+        <groupId>com.arize</groupId>
+        <artifactId>openinference-instrumentation-springAI</artifactId>
+        <version>0.1.0</version>
+    </dependency>
+    
+    <!-- Core packages (usually included as transitive dependencies) -->
+    <dependency>
+        <groupId>com.arize</groupId>
+        <artifactId>openinference-semantic-conventions</artifactId>
+        <version>0.1.1</version>
+    </dependency>
+    <dependency>
+        <groupId>com.arize</groupId>
+        <artifactId>openinference-instrumentation</artifactId>
+        <version>0.1.1</version>
+    </dependency>
+</dependencies>
+```
+
+## Requirements
+
+### General Requirements
+
+- **Java Version**: Java 11 or higher (Java 17+ for Spring AI)
+- **OpenTelemetry**: OpenTelemetry Java 1.49.0 or higher
+- **Build Tools**: Gradle 7.0+ or Maven 3.6+
+
+### Framework-Specific Requirements
+
+#### LangChain4j
+- LangChain4j 1.0.0 or higher
+- Java 11+
+
+#### Spring AI
+- Spring AI 1.0.0 or higher
+- Micrometer Observation 1.15.0 or higher
+- Java 17+
+
+## Quick Start Examples
+
+### LangChain4j
+
+```java
+import com.arize.instrumentation.langchain4j.LangChain4jInstrumentor;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+
+public class QuickStart {
+    public static void main(String[] args) {
+        // Initialize OpenTelemetry (see documentation for details)
+        initializeOpenTelemetry();
+        
+        // Enable instrumentation
+        LangChain4jInstrumentor.instrument();
+        
+        // Use LangChain4j normally - traces are captured automatically
+        OpenAiChatModel model = OpenAiChatModel.builder()
+            .apiKey(System.getenv("OPENAI_API_KEY"))
+            .modelName("gpt-4")
+            .build();
+        
+        String response = model.generate("Hello, world!");
+        System.out.println(response);
+    }
+}
+```
+
+### Spring AI
+
+```java
+import com.arize.instrumentation.OITracer;
+import com.arize.instrumentation.TraceConfig;
+import com.arize.instrumentation.springAI.SpringAIInstrumentor;
+import io.micrometer.observation.ObservationRegistry;
+import org.springframework.ai.openai.OpenAiChatModel;
+
+public class QuickStart {
+    public static void main(String[] args) {
+        // Initialize OpenTelemetry
+        var tracerProvider = initializeOpenTelemetry();
+        
+        // Create OITracer and register handler
+        OITracer tracer = new OITracer(
+            tracerProvider.get("my-app"),
+            TraceConfig.getDefault()
+        );
+        
+        ObservationRegistry registry = ObservationRegistry.create();
+        registry.observationConfig()
+            .observationHandler(new SpringAIInstrumentor(tracer));
+        
+        // Configure chat model with registry
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+            .observationRegistry(registry)
+            .build();
+        
+        // Use Spring AI - traces are captured automatically
+        var response = chatModel.call(
+            new Prompt("Hello, world!")
+        );
+    }
+}
+```
+
+## Features
+
+All OpenInference Java instrumentations provide:
+
+- **Automatic Trace Capture**: LLM calls, parameters, and responses
+- **Token Usage Tracking**: Prompt, completion, and total token counts
+- **Message Tracing**: Input/output messages with roles (user, assistant, system, tool)
+- **Tool Call Tracing**: Function names, arguments, and results
+- **Error Tracking**: Exceptions and error messages
+- **Configurable Privacy**: Hide sensitive input/output data
+- **OpenTelemetry Native**: Works with any OTel-compatible backend
+- **Context Propagation**: Distributed tracing support
+
+## OpenTelemetry Setup
+
+All instrumentations require OpenTelemetry to be initialized. Here's a basic setup:
+
+```java
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+
+public class OpenTelemetryConfig {
+    public static SdkTracerProvider initializeOpenTelemetry() {
+        Resource resource = Resource.getDefault().merge(
+            Resource.create(Attributes.builder()
+                .put("service.name", "my-java-app")
+                .put("service.version", "1.0.0")
+                .build())
+        );
+        
+        OtlpGrpcSpanExporter exporter = OtlpGrpcSpanExporter.builder()
+            .setEndpoint("http://localhost:4317")
+            .build();
+        
+        SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
+            .addSpanProcessor(BatchSpanProcessor.builder(exporter).build())
+            .setResource(resource)
+            .build();
+        
+        OpenTelemetrySdk.builder()
+            .setTracerProvider(tracerProvider)
+            .buildAndRegisterGlobal();
+        
+        return tracerProvider;
+    }
+}
+```
+
+## Viewing Traces
+
+### Using Phoenix (Recommended)
+
+Arize Phoenix is an open-source observability platform designed for LLM applications:
+
+1. **Start Phoenix**:
+   ```bash
+   docker run -p 6006:6006 -p 4317:4317 arizephoenix/phoenix:latest
+   ```
+
+2. **Configure your application** to send traces to `http://localhost:4317`
+
+3. **View traces** at [http://localhost:6006](http://localhost:6006)
+
+### Other OpenTelemetry Backends
+
+OpenInference instrumentations work with any OpenTelemetry-compatible backend:
+
+- **Jaeger**: Distributed tracing platform
+- **Zipkin**: Distributed tracing system
+- **Grafana Tempo**: Scalable distributed tracing backend
+- **Cloud Services**: AWS X-Ray, Google Cloud Trace, Azure Monitor
+
+## Semantic Conventions
+
+OpenInference Java packages follow the OpenInference semantic conventions, which define:
+
+- **Span Kinds**: LLM, Chain, Tool, Agent, Retriever, Embedding, Reranker, Guardrail, Evaluator
+- **Attributes**: Standardized attribute names for model info, tokens, messages, etc.
+- **Message Format**: Structured format for capturing LLM conversations
+
+Learn more in the [Semantic Conventions documentation](/semantic-conventions).
+
+## Common Patterns
+
+### Configuration Privacy Controls
+
+All instrumentations support hiding sensitive data:
+
+```java
+import com.arize.instrumentation.TraceConfig;
+
+TraceConfig config = TraceConfig.builder()
+    .hideInputMessages(true)   // Don't capture input messages
+    .hideOutputMessages(true)  // Don't capture output messages
+    .build();
+```
+
+### Graceful Shutdown
+
+Always flush spans before shutdown:
+
+```java
+public static void main(String[] args) {
+    SdkTracerProvider tracerProvider = initializeOpenTelemetry();
+    
+    // ... your application code ...
+    
+    // Flush and shutdown before exit
+    tracerProvider.forceFlush()
+        .join(10, TimeUnit.SECONDS);
+    tracerProvider.shutdown()
+        .join(10, TimeUnit.SECONDS);
+}
+```
+
+### Custom Attributes
+
+Add custom attributes to your resource:
+
+```java
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.api.common.Attributes;
+
+Resource resource = Resource.getDefault().merge(
+    Resource.create(Attributes.builder()
+        .put("service.name", "my-app")
+        .put("service.version", "1.0.0")
+        .put("deployment.environment", "production")
+        .put("project.name", "my-ai-project")
+        .build())
+);
+```
+
+## Troubleshooting
+
+### Dependency Conflicts
+
+If you encounter OpenTelemetry version conflicts:
+
+```gradle
+configurations.all {
+    resolutionStrategy {
+        force 'io.opentelemetry:opentelemetry-api:1.49.0'
+        force 'io.opentelemetry:opentelemetry-sdk:1.49.0'
+    }
+}
+```
+
+### Missing Traces
+
+1. Verify OpenTelemetry is initialized before instrumentation
+2. Check that OTLP endpoint is reachable
+3. Ensure `forceFlush()` is called before application exit
+4. Enable debug logging: `-Dio.opentelemetry.javaagent.debug=true`
+
+### Performance Considerations
+
+- Use `BatchSpanProcessor` instead of `SimpleSpanProcessor` in production
+- Configure appropriate batch sizes and delays
+- Consider sampling for high-volume applications
+
+## Examples and Resources
+
+### Example Applications
+
+Complete working examples are available in the OpenInference repository:
+
+- [LangChain4j Example](https://github.com/Arize-ai/openinference/tree/main/java/examples/langchain4j-example)
+- [Spring AI Example](https://github.com/Arize-ai/openinference/tree/main/java/examples/spring-ai-example)
+
+### Documentation Links
+
+- [OpenInference Specification](https://github.com/Arize-ai/openinference)
+- [OpenTelemetry Java Documentation](https://opentelemetry.io/docs/instrumentation/java/)
+- [LangChain4j Documentation](https://docs.langchain4j.dev/)
+- [Spring AI Documentation](https://docs.spring.io/spring-ai/reference/)
+- [Arize Phoenix Documentation](https://docs.arize.com/phoenix)
+
+### Community and Support
+
+- **GitHub Issues**: [Report bugs or request features](https://github.com/Arize-ai/openinference/issues)
+- **Discussions**: [Ask questions and share ideas](https://github.com/Arize-ai/openinference/discussions)
+- **Slack Community**: [Join the Arize community](https://join.slack.com/t/arize-ai/shared_invite/zt-1px8dcmlf-fmThhDFD_V_48oU7ALan4Q)
+
+## Contributing
+
+Contributions are welcome! See the [Contributing Guide](https://github.com/Arize-ai/openinference/blob/main/CONTRIBUTING.md) for details.
+
+## License
+
+All OpenInference Java packages are released under the Apache License 2.0.

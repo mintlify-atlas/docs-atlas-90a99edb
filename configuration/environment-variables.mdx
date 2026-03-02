@@ -1,0 +1,233 @@
+---
+title: Environment Variables
+description: Configure OpenInference tracing behavior using environment variables
+---
+
+# Environment Variables
+
+OpenInference supports configuration through environment variables, providing a convenient way to control tracing behavior without modifying your code.
+
+## Overview
+
+Environment variables allow you to:
+- Configure tracing behavior globally across your application
+- Adjust observability levels between different environments (dev, staging, production)
+- Control privacy and security settings without code changes
+
+## Configuration Precedence
+
+When both environment variables and TraceConfig are used:
+1. Values set in TraceConfig objects (highest priority)
+2. Environment variables
+3. Default values (lowest priority)
+
+## Supported Variables
+
+### Input/Output Controls
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `OPENINFERENCE_HIDE_INPUTS` | bool | `False` | Hides input.value and all input messages. Input messages are hidden if either `HIDE_INPUTS` OR `HIDE_INPUT_MESSAGES` is true |
+| `OPENINFERENCE_HIDE_OUTPUTS` | bool | `False` | Hides output.value and all output messages. Output messages are hidden if either `HIDE_OUTPUTS` OR `HIDE_OUTPUT_MESSAGES` is true |
+| `OPENINFERENCE_HIDE_INPUT_MESSAGES` | bool | `False` | Hides all input messages (independent of `HIDE_INPUTS`) |
+| `OPENINFERENCE_HIDE_OUTPUT_MESSAGES` | bool | `False` | Hides all output messages (independent of `HIDE_OUTPUTS`) |
+
+### Message Content Controls
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `OPENINFERENCE_HIDE_INPUT_IMAGES` | bool | `False` | Hides images from input messages (only applies when input messages are not already hidden) |
+| `OPENINFERENCE_HIDE_INPUT_TEXT` | bool | `False` | Hides text from input messages (only applies when input messages are not already hidden) |
+| `OPENINFERENCE_HIDE_OUTPUT_TEXT` | bool | `False` | Hides text from output messages (only applies when output messages are not already hidden) |
+
+### LLM-Specific Controls
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `OPENINFERENCE_HIDE_LLM_INVOCATION_PARAMETERS` | bool | `False` | Hides LLM invocation parameters (independent of input/output hiding) |
+| `OPENINFERENCE_HIDE_PROMPTS` | bool | `False` | Hides LLM prompts (completions API) |
+| `OPENINFERENCE_HIDE_CHOICES` | bool | `False` | Hides LLM choices (completions API outputs) |
+
+### Embedding Controls
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `OPENINFERENCE_HIDE_EMBEDDINGS_VECTORS` | bool | `False` | Replaces embedding.embeddings.*.embedding.vector values with `"__REDACTED__"` |
+| `OPENINFERENCE_HIDE_EMBEDDINGS_TEXT` | bool | `False` | Replaces embedding.embeddings.*.embedding.text values with `"__REDACTED__"` |
+| `OPENINFERENCE_HIDE_EMBEDDING_VECTORS` | bool | `False` | **Deprecated:** Use `OPENINFERENCE_HIDE_EMBEDDINGS_VECTORS` instead |
+
+### Size Limits
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `OPENINFERENCE_BASE64_IMAGE_MAX_LENGTH` | int | `32000` | Limits characters of a base64 encoding of an image. Images exceeding this length will be replaced with `"__REDACTED__"` |
+
+## Usage Examples
+
+### Bash/Shell
+
+```bash
+# Hide all inputs and outputs
+export OPENINFERENCE_HIDE_INPUTS=true
+export OPENINFERENCE_HIDE_OUTPUTS=true
+
+# Run your application
+python app.py
+```
+
+### Docker
+
+```dockerfile
+FROM python:3.11
+
+# Set environment variables
+ENV OPENINFERENCE_HIDE_INPUT_TEXT=true
+ENV OPENINFERENCE_HIDE_OUTPUT_TEXT=true
+ENV OPENINFERENCE_BASE64_IMAGE_MAX_LENGTH=16000
+
+COPY . /app
+WORKDIR /app
+RUN pip install -r requirements.txt
+
+CMD ["python", "app.py"]
+```
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  app:
+    build: .
+    environment:
+      - OPENINFERENCE_HIDE_INPUTS=false
+      - OPENINFERENCE_HIDE_OUTPUTS=false
+      - OPENINFERENCE_HIDE_INPUT_IMAGES=true
+      - OPENINFERENCE_BASE64_IMAGE_MAX_LENGTH=16000
+```
+
+### Kubernetes
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openinference-config
+data:
+  OPENINFERENCE_HIDE_INPUT_TEXT: "true"
+  OPENINFERENCE_HIDE_OUTPUT_TEXT: "true"
+  OPENINFERENCE_BASE64_IMAGE_MAX_LENGTH: "16000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  template:
+    spec:
+      containers:
+      - name: app
+        image: my-app:latest
+        envFrom:
+        - configMapRef:
+            name: openinference-config
+```
+
+### Python (.env file)
+
+```python
+# .env
+OPENINFERENCE_HIDE_INPUTS=false
+OPENINFERENCE_HIDE_OUTPUTS=false
+OPENINFERENCE_HIDE_INPUT_IMAGES=true
+OPENINFERENCE_BASE64_IMAGE_MAX_LENGTH=16000
+```
+
+```python
+# app.py
+from dotenv import load_dotenv
+load_dotenv()
+
+# Environment variables are automatically picked up
+from openinference.instrumentation.openai import OpenAIInstrumentor
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+```
+
+### Node.js (.env file)
+
+```bash
+# .env
+OPENINFERENCE_HIDE_INPUTS=false
+OPENINFERENCE_HIDE_OUTPUTS=false
+OPENINFERENCE_HIDE_INPUT_IMAGES=true
+OPENINFERENCE_BASE64_IMAGE_MAX_LENGTH=16000
+```
+
+```typescript
+// app.ts
+import { config } from "dotenv";
+config();
+
+// Environment variables are automatically picked up
+import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai";
+const instrumentation = new OpenAIInstrumentation();
+```
+
+## Boolean Values
+
+Boolean environment variables accept the following values (case-insensitive):
+- `true`, `True`, `TRUE` → `true`
+- `false`, `False`, `FALSE` → `false`
+- Any other value → defaults to `false`
+
+## Integer Values
+
+Integer environment variables (like `OPENINFERENCE_BASE64_IMAGE_MAX_LENGTH`):
+- Must be valid integer strings (e.g., `"16000"`, `"32000"`)
+- Invalid values will fall back to the default value
+- In Java, can also be set to `"unlimited"` for no limit
+
+## Common Scenarios
+
+### Development Environment
+
+```bash
+# Maximum observability - see everything
+export OPENINFERENCE_HIDE_INPUTS=false
+export OPENINFERENCE_HIDE_OUTPUTS=false
+```
+
+### Production Environment
+
+```bash
+# Hide sensitive text but keep structure
+export OPENINFERENCE_HIDE_INPUT_TEXT=true
+export OPENINFERENCE_HIDE_OUTPUT_TEXT=true
+export OPENINFERENCE_HIDE_EMBEDDINGS_TEXT=true
+```
+
+### Compliance Requirements
+
+```bash
+# Hide all potentially sensitive data
+export OPENINFERENCE_HIDE_INPUTS=true
+export OPENINFERENCE_HIDE_OUTPUTS=true
+export OPENINFERENCE_HIDE_EMBEDDINGS_VECTORS=true
+export OPENINFERENCE_HIDE_EMBEDDINGS_TEXT=true
+```
+
+### Reduce Payload Size
+
+```bash
+# Limit image sizes to reduce storage costs
+export OPENINFERENCE_BASE64_IMAGE_MAX_LENGTH=8000
+```
+
+## Redacted Content
+
+When content is hidden due to environment variable settings, the value `"__REDACTED__"` is used as a placeholder. This allows trace consumers to identify that content was intentionally hidden rather than missing or empty.
+
+## Next Steps
+
+- See [TraceConfig](/configuration/trace-config) for programmatic configuration
+- See [Privacy Controls](/configuration/privacy-controls) for detailed privacy scenarios

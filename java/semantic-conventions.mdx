@@ -1,0 +1,285 @@
+---
+title: Semantic Conventions
+description: OpenInference semantic conventions for Java
+---
+
+The `openinference-semantic-conventions` package provides Java constants for OpenInference semantic conventions, enabling consistent instrumentation across AI/ML applications.
+
+## Installation
+
+```gradle
+implementation 'com.arize:openinference-semantic-conventions:0.1.1'
+```
+
+## Package Structure
+
+All semantic conventions are defined in the `com.arize.semconv.trace.SemanticConventions` class.
+
+## Span Kinds
+
+OpenInference defines specialized span kinds for AI operations:
+
+```java
+import com.arize.semconv.trace.SemanticConventions;
+import com.arize.semconv.trace.SemanticConventions.OpenInferenceSpanKind;
+
+// Available span kinds
+OpenInferenceSpanKind.LLM          // Large Language Model operations
+OpenInferenceSpanKind.CHAIN        // Chain of operations
+OpenInferenceSpanKind.TOOL         // Tool execution
+OpenInferenceSpanKind.RETRIEVER    // Document retrieval
+OpenInferenceSpanKind.RERANKER     // Document reranking
+OpenInferenceSpanKind.EMBEDDING    // Embedding generation
+OpenInferenceSpanKind.AGENT        // Agent operations
+OpenInferenceSpanKind.GUARDRAIL    // Safety guardrails
+OpenInferenceSpanKind.EVALUATOR    // Evaluation operations
+
+// Set span kind attribute
+span.setAttribute(
+    SemanticConventions.OPENINFERENCE_SPAN_KIND,
+    OpenInferenceSpanKind.LLM.getValue()
+);
+```
+
+## LLM Attributes
+
+### Basic LLM Attributes
+
+```java
+import com.arize.semconv.trace.SemanticConventions;
+
+// Model information
+span.setAttribute(SemanticConventions.LLM_MODEL_NAME, "gpt-4");
+span.setAttribute(SemanticConventions.LLM_PROVIDER, "openai");
+span.setAttribute(SemanticConventions.LLM_SYSTEM, "openai");
+
+// Input/Output messages
+span.setAttribute(SemanticConventions.LLM_INPUT_MESSAGES, messagesJson);
+span.setAttribute(SemanticConventions.LLM_OUTPUT_MESSAGES, responseJson);
+
+// Prompts (legacy completions)
+span.setAttribute(SemanticConventions.LLM_PROMPTS, promptsJson);
+
+// Invocation parameters
+span.setAttribute(SemanticConventions.LLM_INVOCATION_PARAMETERS, paramsJson);
+```
+
+### Token Counts
+
+```java
+// Basic token counts
+span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_PROMPT, 150L);
+span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_COMPLETION, 75L);
+span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_TOTAL, 225L);
+
+// Prompt details
+span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_WRITE, 20L);
+span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_READ, 10L);
+span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_PROMPT_DETAILS_AUDIO, 5L);
+
+// Completion details
+span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_COMPLETION_DETAILS_REASONING, 50L);
+span.setAttribute(SemanticConventions.LLM_TOKEN_COUNT_COMPLETION_DETAILS_AUDIO, 10L);
+```
+
+### Cost Tracking
+
+```java
+// Basic costs (in USD)
+span.setAttribute(SemanticConventions.LLM_COST_PROMPT, 0.0021);
+span.setAttribute(SemanticConventions.LLM_COST_COMPLETION, 0.0045);
+span.setAttribute(SemanticConventions.LLM_COST_TOTAL, 0.0066);
+
+// Detailed costs
+span.setAttribute(SemanticConventions.LLM_COST_INPUT, 0.0003);
+span.setAttribute(SemanticConventions.LLM_COST_OUTPUT, 0.0009);
+span.setAttribute(SemanticConventions.LLM_COST_COMPLETION_DETAILS_REASONING, 0.0024);
+span.setAttribute(SemanticConventions.LLM_COST_PROMPT_DETAILS_CACHE_WRITE, 0.0006);
+```
+
+## Message Attributes
+
+```java
+// Message structure
+span.setAttribute(SemanticConventions.MESSAGE_ROLE, "user");
+span.setAttribute(SemanticConventions.MESSAGE_CONTENT, "What is the capital of France?");
+span.setAttribute(SemanticConventions.MESSAGE_NAME, "function_name");
+
+// Message contents (multimodal)
+span.setAttribute(SemanticConventions.MESSAGE_CONTENTS, contentsJson);
+span.setAttribute(SemanticConventions.MESSAGE_CONTENT_TYPE, "text");
+span.setAttribute(SemanticConventions.MESSAGE_CONTENT_TEXT, "Hello");
+span.setAttribute(SemanticConventions.MESSAGE_CONTENT_IMAGE, imageDataJson);
+
+// Tool calls
+span.setAttribute(SemanticConventions.MESSAGE_TOOL_CALLS, toolCallsJson);
+span.setAttribute(SemanticConventions.MESSAGE_TOOL_CALL_ID, "call_123");
+span.setAttribute(SemanticConventions.MESSAGE_FUNCTION_CALL_NAME, "get_weather");
+span.setAttribute(SemanticConventions.MESSAGE_FUNCTION_CALL_ARGUMENTS_JSON, argsJson);
+```
+
+## Tool Call Attributes
+
+```java
+// Tool call details
+span.setAttribute(SemanticConventions.TOOL_CALL_ID, "call_123");
+span.setAttribute(SemanticConventions.TOOL_CALL_FUNCTION_NAME, "get_weather");
+span.setAttribute(SemanticConventions.TOOL_CALL_FUNCTION_ARGUMENTS_JSON, "{\"location\": \"Paris\"}");
+
+// Tool definitions
+span.setAttribute(SemanticConventions.TOOL_NAME, "get_weather");
+span.setAttribute(SemanticConventions.TOOL_DESCRIPTION, "Get current weather");
+span.setAttribute(SemanticConventions.TOOL_PARAMETERS, parametersJson);
+span.setAttribute(SemanticConventions.TOOL_JSON_SCHEMA, schemaJson);
+span.setAttribute(SemanticConventions.LLM_TOOLS, toolsJson);
+```
+
+## Retrieval Attributes
+
+```java
+// Retrieved documents
+span.setAttribute(SemanticConventions.RETRIEVAL_DOCUMENTS, documentsJson);
+
+// Document attributes
+span.setAttribute(SemanticConventions.DOCUMENT_ID, "doc_123");
+span.setAttribute(SemanticConventions.DOCUMENT_CONTENT, "Document text...");
+span.setAttribute(SemanticConventions.DOCUMENT_SCORE, 0.95);
+span.setAttribute(SemanticConventions.DOCUMENT_METADATA, metadataJson);
+```
+
+## Reranker Attributes
+
+```java
+// Reranker operation
+span.setAttribute(SemanticConventions.RERANKER_INPUT_DOCUMENTS, inputDocsJson);
+span.setAttribute(SemanticConventions.RERANKER_OUTPUT_DOCUMENTS, outputDocsJson);
+span.setAttribute(SemanticConventions.RERANKER_QUERY, "search query");
+span.setAttribute(SemanticConventions.RERANKER_MODEL_NAME, "reranker-v1");
+span.setAttribute(SemanticConventions.RERANKER_TOP_K, 10);
+```
+
+## Embedding Attributes
+
+```java
+// Embedding generation
+span.setAttribute(SemanticConventions.EMBEDDING_TEXT, "Text to embed");
+span.setAttribute(SemanticConventions.EMBEDDING_MODEL_NAME, "text-embedding-ada-002");
+span.setAttribute(SemanticConventions.EMBEDDING_VECTOR, vectorJson);
+span.setAttribute(SemanticConventions.EMBEDDING_EMBEDDINGS, embeddingsJson);
+```
+
+## Input/Output Attributes
+
+```java
+// Generic input/output
+span.setAttribute(SemanticConventions.INPUT_VALUE, inputJson);
+span.setAttribute(SemanticConventions.INPUT_MIME_TYPE, "application/json");
+span.setAttribute(SemanticConventions.OUTPUT_VALUE, outputJson);
+span.setAttribute(SemanticConventions.OUTPUT_MIME_TYPE, "application/json");
+```
+
+## Session and User Tracking
+
+```java
+// Session tracking
+span.setAttribute(SemanticConventions.SESSION_ID, "session_123");
+
+// User tracking
+span.setAttribute(SemanticConventions.USER_ID, "user_456");
+
+// Tags
+span.setAttribute(SemanticConventions.TAG_TAGS, tagsJson);
+
+// Metadata
+span.setAttribute(SemanticConventions.METADATA, metadataJson);
+```
+
+## Prompt Template Attributes
+
+```java
+// Prompt template
+span.setAttribute(SemanticConventions.PROMPT_TEMPLATE_TEMPLATE, "Hello {name}!");
+span.setAttribute(SemanticConventions.PROMPT_TEMPLATE_VARIABLES, variablesJson);
+span.setAttribute(SemanticConventions.PROMPT_TEMPLATE_VERSION, "v1.0");
+
+// Prompt metadata
+span.setAttribute(SemanticConventions.PROMPT_VENDOR, "langchain");
+span.setAttribute(SemanticConventions.PROMPT_ID, "prompt_123");
+span.setAttribute(SemanticConventions.PROMPT_URL, "https://example.com/prompts/123");
+```
+
+## Multimodal Attributes
+
+```java
+// Image attributes
+span.setAttribute(SemanticConventions.IMAGE_URL, "https://example.com/image.jpg");
+
+// Audio attributes
+span.setAttribute(SemanticConventions.AUDIO_URL, "https://example.com/audio.wav");
+span.setAttribute(SemanticConventions.AUDIO_MIME_TYPE, "audio/wav");
+span.setAttribute(SemanticConventions.AUDIO_TRANSCRIPT, "Transcribed text...");
+```
+
+## Agent and Graph Attributes
+
+```java
+// Agent attributes
+span.setAttribute(SemanticConventions.AGENT_NAME, "my-agent");
+
+// Graph structure
+span.setAttribute(SemanticConventions.GRAPH_NODE_ID, "node_1");
+span.setAttribute(SemanticConventions.GRAPH_NODE_NAME, "Decision Node");
+span.setAttribute(SemanticConventions.GRAPH_NODE_PARENT_ID, "node_0");
+```
+
+## Enums
+
+### LLMSystem
+
+```java
+import com.arize.semconv.trace.SemanticConventions.LLMSystem;
+
+LLMSystem.OPENAI      // "openai"
+LLMSystem.ANTHROPIC   // "anthropic"
+LLMSystem.MISTRALAI   // "mistralai"
+LLMSystem.COHERE      // "cohere"
+LLMSystem.VERTEXAI    // "vertexai"
+```
+
+### LLMProvider
+
+```java
+import com.arize.semconv.trace.SemanticConventions.LLMProvider;
+
+LLMProvider.OPENAI     // "openai"
+LLMProvider.ANTHROPIC  // "anthropic"
+LLMProvider.MISTRALAI  // "mistralai"
+LLMProvider.COHERE     // "cohere"
+LLMProvider.GOOGLE     // "google"
+LLMProvider.AWS        // "aws"
+LLMProvider.AZURE      // "azure"
+LLMProvider.XAI        // "xai"
+LLMProvider.DEEPSEEK   // "deepseek"
+```
+
+### MimeType
+
+```java
+import com.arize.semconv.trace.SemanticConventions.MimeType;
+
+MimeType.TEXT       // "text/plain"
+MimeType.JSON       // "application/json"
+MimeType.AUDIO_WAV  // "audio/wav"
+```
+
+## Class Reference
+
+**Main Class:** `com.arize.semconv.trace.SemanticConventions`
+
+**Related Classes:**
+- `com.arize.semconv.trace.SemanticResourceAttributes`
+
+## Next Steps
+
+- Learn about [Base Instrumentation](/java/instrumentation)
+- Explore [Instrumentations](/java/instrumentations)

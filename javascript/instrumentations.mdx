@@ -1,0 +1,385 @@
+---
+title: "Instrumentations"
+description: "Overview of OpenInference JavaScript instrumentation packages"
+---
+
+## Available Instrumentations
+
+OpenInference provides automatic instrumentation for popular LLM frameworks and providers in JavaScript:
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="robot" href="/instrumentations/openai">
+    Auto-instrument OpenAI SDK calls
+  </Card>
+  <Card title="LangChain" icon="link" href="/instrumentations/langchain">
+    Auto-instrument LangChain.js applications
+  </Card>
+  <Card title="Anthropic" icon="message-bot" href="/instrumentations/anthropic">
+    Auto-instrument Anthropic SDK
+  </Card>
+  <Card title="AWS Bedrock" icon="aws" href="/instrumentations/bedrock">
+    Auto-instrument AWS Bedrock calls
+  </Card>
+</CardGroup>
+
+## Instrumentation Packages
+
+| Package | Version | Description | Requires Manual Setup |
+|---------|---------|-------------|----------------------|
+| `@arizeai/openinference-instrumentation-openai` | ![npm](https://img.shields.io/npm/v/@arizeai/openinference-instrumentation-openai) | OpenAI SDK instrumentation | No |
+| `@arizeai/openinference-instrumentation-langchain` | ![npm](https://img.shields.io/npm/v/@arizeai/openinference-instrumentation-langchain) | LangChain.js (v1.x) instrumentation | Yes |
+| `@arizeai/openinference-instrumentation-langchain-v0` | ![npm](https://img.shields.io/npm/v/@arizeai/openinference-instrumentation-langchain-v0) | LangChain.js (v0.x) instrumentation | Yes |
+| `@arizeai/openinference-instrumentation-anthropic` | ![npm](https://img.shields.io/npm/v/@arizeai/openinference-instrumentation-anthropic) | Anthropic SDK instrumentation | No |
+| `@arizeai/openinference-instrumentation-bedrock` | ![npm](https://img.shields.io/npm/v/@arizeai/openinference-instrumentation-bedrock) | AWS Bedrock instrumentation | No |
+| `@arizeai/openinference-instrumentation-bedrock-agent-runtime` | ![npm](https://img.shields.io/npm/v/@arizeai/openinference-instrumentation-bedrock-agent-runtime) | AWS Bedrock Agent Runtime | No |
+| `@arizeai/openinference-instrumentation-beeai` | ![npm](https://img.shields.io/npm/v/@arizeai/openinference-instrumentation-beeai) | BeeAI framework instrumentation | No |
+| `@arizeai/openinference-instrumentation-claude-agent-sdk` | ![npm](https://img.shields.io/npm/v/@arizeai/openinference-instrumentation-claude-agent-sdk) | Claude Agent SDK instrumentation | No |
+| `@arizeai/openinference-instrumentation-mcp` | ![npm](https://img.shields.io/npm/v/@arizeai/openinference-instrumentation-mcp) | MCP (Model Context Protocol) | No |
+
+## Installation
+
+Install the OpenTelemetry SDK and your chosen instrumentation:
+
+<CodeGroup>
+```bash npm
+npm install --save \
+  @opentelemetry/sdk-trace-node \
+  @opentelemetry/instrumentation \
+  @arizeai/openinference-instrumentation-openai
+```
+
+```bash yarn
+yarn add \
+  @opentelemetry/sdk-trace-node \
+  @opentelemetry/instrumentation \
+  @arizeai/openinference-instrumentation-openai
+```
+
+```bash pnpm
+pnpm add \
+  @opentelemetry/sdk-trace-node \
+  @opentelemetry/instrumentation \
+  @arizeai/openinference-instrumentation-openai
+```
+</CodeGroup>
+
+## Basic Usage
+
+Most instrumentations use the standard OpenTelemetry registration pattern:
+
+```typescript instrumentation.ts
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai";
+
+const provider = new NodeTracerProvider();
+provider.register();
+
+registerInstrumentations({
+  instrumentations: [new OpenAIInstrumentation()],
+});
+```
+
+<Warning>
+Load instrumentation **before** importing your application code:
+
+```bash
+node -r ./instrumentation.js ./app.js
+```
+</Warning>
+
+## Manual Instrumentation Required
+
+Some frameworks require manual instrumentation due to their module structure:
+
+### LangChain.js
+
+LangChain must be manually instrumented:
+
+```typescript instrumentation.ts
+import { LangChainInstrumentation } from "@arizeai/openinference-instrumentation-langchain";
+import * as lcCallbackManager from "@langchain/core/callbacks/manager";
+
+const lcInstrumentation = new LangChainInstrumentation();
+lcInstrumentation.manuallyInstrument(lcCallbackManager);
+```
+
+### LangChain v0.x
+
+For LangChain 0.x versions:
+
+```typescript instrumentation.ts
+import { LangChainInstrumentation } from "@arizeai/openinference-instrumentation-langchain-v0";
+import * as langchain from "langchain/callbacks";
+
+const lcInstrumentation = new LangChainInstrumentation();
+lcInstrumentation.manuallyInstrument(langchain);
+```
+
+## Multiple Instrumentations
+
+You can register multiple instrumentations simultaneously:
+
+```typescript
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai";
+import { AnthropicInstrumentation } from "@arizeai/openinference-instrumentation-anthropic";
+import { BedrockInstrumentation } from "@arizeai/openinference-instrumentation-bedrock";
+
+registerInstrumentations({
+  instrumentations: [
+    new OpenAIInstrumentation(),
+    new AnthropicInstrumentation(),
+    new BedrockInstrumentation(),
+  ],
+});
+```
+
+## Configuration Options
+
+Each instrumentation can be configured with trace config options:
+
+```typescript
+import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai";
+
+registerInstrumentations({
+  instrumentations: [
+    new OpenAIInstrumentation({
+      traceConfig: {
+        hideInputs: false,
+        hideOutputs: false,
+        hideInputMessages: false,
+        hideOutputMessages: false,
+        hideInputImages: true,
+        hideEmbeddingVectors: false,
+        base64ImageMaxLength: 32000,
+      },
+    }),
+  ],
+});
+```
+
+### Common Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `hideInputs` | `boolean` | `false` | Hide all input values |
+| `hideOutputs` | `boolean` | `false` | Hide all output values |
+| `hideInputMessages` | `boolean` | `false` | Hide LLM input messages |
+| `hideOutputMessages` | `boolean` | `false` | Hide LLM output messages |
+| `hideInputImages` | `boolean` | `false` | Hide input images |
+| `hideInputText` | `boolean` | `false` | Hide input text |
+| `hideOutputText` | `boolean` | `false` | Hide output text |
+| `hideEmbeddingVectors` | `boolean` | `false` | Hide embedding vectors |
+| `hidePrompts` | `boolean` | `false` | Hide prompt templates |
+| `base64ImageMaxLength` | `number` | `32000` | Max base64 image length |
+
+## Environment Variables
+
+Configure instrumentation behavior via environment variables:
+
+```bash .env
+OPENINFERENCE_HIDE_INPUTS=false
+OPENINFERENCE_HIDE_OUTPUTS=false
+OPENINFERENCE_HIDE_INPUT_MESSAGES=false
+OPENINFERENCE_HIDE_OUTPUT_MESSAGES=false
+OPENINFERENCE_HIDE_INPUT_IMAGES=true
+OPENINFERENCE_HIDE_INPUT_TEXT=false
+OPENINFERENCE_HIDE_OUTPUT_TEXT=false
+OPENINFERENCE_HIDE_EMBEDDING_VECTORS=false
+OPENINFERENCE_BASE64_IMAGE_MAX_LENGTH=32000
+OPENINFERENCE_HIDE_PROMPTS=false
+```
+
+## Suppressing Tracing
+
+All instrumentations respect the OpenTelemetry `isTracingSuppressed()` flag:
+
+```typescript
+import { context } from "@opentelemetry/api";
+import { suppressTracing } from "@opentelemetry/core";
+import OpenAI from "openai";
+
+const client = new OpenAI();
+
+// This call will not be traced
+context.with(suppressTracing(context.active()), async () => {
+  await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello" }],
+  });
+});
+```
+
+## Context Propagation
+
+All instrumentations automatically propagate context attributes set via `@arizeai/openinference-core`:
+
+```typescript
+import { context } from "@opentelemetry/api";
+import { setSession, setUser } from "@arizeai/openinference-core";
+import OpenAI from "openai";
+
+const client = new OpenAI();
+
+const enrichedContext = setUser(
+  setSession(context.active(), { sessionId: "sess-123" }),
+  { userId: "user-456" }
+);
+
+context.with(enrichedContext, async () => {
+  // Session and user IDs will appear in the trace
+  await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello" }],
+  });
+});
+```
+
+## Complete Example
+
+```typescript instrumentation.ts
+import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+import { Resource } from "@opentelemetry/resources";
+import { NodeTracerProvider, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-node";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
+import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai";
+
+// Enable debug logging (optional)
+diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
+
+// Configure provider
+const provider = new NodeTracerProvider({
+  resource: new Resource({
+    [SemanticResourceAttributes.SERVICE_NAME]: "my-ai-app",
+  }),
+});
+
+// Add OTLP exporter
+provider.addSpanProcessor(
+  new SimpleSpanProcessor(
+    new OTLPTraceExporter({
+      url: process.env.COLLECTOR_ENDPOINT || "http://localhost:6006/v1/traces",
+    })
+  )
+);
+
+// Register instrumentations
+registerInstrumentations({
+  instrumentations: [
+    new OpenAIInstrumentation({
+      traceConfig: {
+        hideInputImages: true,
+      },
+    }),
+  ],
+});
+
+// Register provider
+provider.register();
+
+console.log("OpenInference instrumentation initialized");
+```
+
+```typescript app.ts
+import OpenAI from "openai";
+
+const client = new OpenAI();
+
+async function main() {
+  const response = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "What is OpenInference?" }],
+  });
+  
+  console.log(response.choices[0].message.content);
+}
+
+main();
+```
+
+```bash
+node -r ./instrumentation.js ./app.js
+```
+
+## Testing Instrumentations
+
+When developing or testing instrumented applications:
+
+1. **Use console exporter** for local development:
+
+```typescript
+import { ConsoleSpanExporter } from "@opentelemetry/sdk-trace-base";
+
+provider.addSpanProcessor(
+  new SimpleSpanProcessor(new ConsoleSpanExporter())
+);
+```
+
+2. **Enable debug logging** to troubleshoot issues:
+
+```typescript
+import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
+
+diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
+```
+
+3. **Verify context propagation**:
+
+```typescript
+import { context, trace } from "@opentelemetry/api";
+
+const span = trace.getTracer("test").startSpan("test");
+const ctx = trace.setSpan(context.active(), span);
+
+context.with(ctx, () => {
+  // Your instrumented code here
+});
+
+span.end();
+```
+
+## Best Practices
+
+<Tip>
+**Load instrumentation first**: Always load your instrumentation file before importing application code using the `-r` flag.
+</Tip>
+
+<Tip>
+**Use environment variables**: Configure data masking via environment variables for flexibility across environments.
+</Tip>
+
+<Warning>
+**Respect suppressed tracing**: When using `suppressTracing()`, ensure sensitive operations are not traced.
+</Warning>
+
+<Tip>
+**Batch exporters in production**: Use `BatchSpanProcessor` instead of `SimpleSpanProcessor` for better performance:
+
+```typescript
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
+
+provider.addSpanProcessor(
+  new BatchSpanProcessor(new OTLPTraceExporter())
+);
+```
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Core Package" icon="cube" href="/javascript/core">
+    Use OITracer and context attributes
+  </Card>
+  <Card title="OpenAI" icon="robot" href="/instrumentations/openai">
+    OpenAI-specific instrumentation docs
+  </Card>
+  <Card title="LangChain" icon="link" href="/instrumentations/langchain">
+    LangChain-specific instrumentation docs
+  </Card>
+  <Card title="Examples" icon="code" href="/examples">
+    View complete examples
+  </Card>
+</CardGroup>

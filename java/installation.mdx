@@ -1,0 +1,91 @@
+---
+title: Installation
+description: Install OpenInference Java instrumentation packages
+---
+
+## Requirements
+
+- Java 11 or higher
+- OpenTelemetry Java 1.49.0 or higher
+
+## Gradle
+
+Add the following dependencies to your `build.gradle`:
+
+```gradle
+dependencies {
+    implementation 'com.arize:openinference-semantic-conventions:0.1.1'
+    implementation 'com.arize:openinference-instrumentation:0.1.1'
+    
+    // For LangChain4j instrumentation
+    implementation 'com.arize:openinference-instrumentation-langchain4j:0.1.1'
+    
+    // For Spring AI instrumentation
+    implementation 'com.arize:openinference-instrumentation-springAI:0.1.1'
+}
+```
+
+## Maven
+
+Add the following dependencies to your `pom.xml`:
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>com.arize</groupId>
+        <artifactId>openinference-semantic-conventions</artifactId>
+        <version>0.1.1</version>
+    </dependency>
+    <dependency>
+        <groupId>com.arize</groupId>
+        <artifactId>openinference-instrumentation</artifactId>
+        <version>0.1.1</version>
+    </dependency>
+    
+    <!-- For LangChain4j instrumentation -->
+    <dependency>
+        <groupId>com.arize</groupId>
+        <artifactId>openinference-instrumentation-langchain4j</artifactId>
+        <version>0.1.1</version>
+    </dependency>
+    
+    <!-- For Spring AI instrumentation -->
+    <dependency>
+        <groupId>com.arize</groupId>
+        <artifactId>openinference-instrumentation-springAI</artifactId>
+        <version>0.1.1</version>
+    </dependency>
+</dependencies>
+```
+
+## Package Overview
+
+### openinference-semantic-conventions
+
+Provides Java constants for OpenInference semantic conventions, including span attributes and span kinds.
+
+**Package:** `com.arize.semconv.trace`
+
+### openinference-instrumentation
+
+Base instrumentation utilities including `OITracer` and `TraceConfig` for configuring trace behavior.
+
+**Package:** `com.arize.instrumentation`
+
+### openinference-instrumentation-langchain4j
+
+Auto-instrumentation for LangChain4j applications.
+
+**Package:** `com.arize.instrumentation.langchain4j`
+
+### openinference-instrumentation-springAI
+
+Instrumentation for Spring AI applications using Micrometer observation handlers.
+
+**Package:** `com.arize.instrumentation.springAI`
+
+## Next Steps
+
+- Learn about [Semantic Conventions](/java/semantic-conventions)
+- Set up [Instrumentation](/java/instrumentation)
+- Explore available [Instrumentations](/java/instrumentations)

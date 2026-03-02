@@ -1,0 +1,110 @@
+---
+title: All Python Instrumentations
+description: Complete list of all OpenInference Python instrumentation packages
+---
+
+OpenInference provides comprehensive Python instrumentation for AI/ML frameworks and LLM providers. All instrumentations are fully OpenTelemetry compatible and can be sent to any OpenTelemetry collector for viewing, such as [Arize Phoenix](https://github.com/Arize-ai/phoenix).
+
+## Available Instrumentations
+
+The following table lists all available Python instrumentation packages:
+
+| Package | Description | PyPI |
+|---------|-------------|------|
+| **openinference-instrumentation-openai** | Auto-instrumentation for OpenAI's Python SDK | [PyPI](https://pypi.org/project/openinference-instrumentation-openai/) |
+| **openinference-instrumentation-anthropic** | Auto-instrumentation for Anthropic SDK | [PyPI](https://pypi.org/project/openinference-instrumentation-anthropic/) |
+| **openinference-instrumentation-langchain** | Auto-instrumentation for LangChain (1.x and Classic) | [PyPI](https://pypi.org/project/openinference-instrumentation-langchain/) |
+| **openinference-instrumentation-llama-index** | Auto-instrumentation for LlamaIndex | [PyPI](https://pypi.org/project/openinference-instrumentation-llama-index/) |
+| **openinference-instrumentation-bedrock** | Auto-instrumentation for AWS Bedrock (boto3 and aioboto3) | [PyPI](https://pypi.org/project/openinference-instrumentation-bedrock/) |
+| **openinference-instrumentation-vertexai** | Auto-instrumentation for Google Vertex AI | [PyPI](https://pypi.org/project/openinference-instrumentation-vertexai/) |
+| **openinference-instrumentation-mistralai** | Auto-instrumentation for Mistral AI SDK | [PyPI](https://pypi.org/project/openinference-instrumentation-mistralai/) |
+| **openinference-instrumentation-dspy** | Auto-instrumentation for DSPy | [PyPI](https://pypi.org/project/openinference-instrumentation-dspy/) |
+| **openinference-instrumentation-haystack** | Auto-instrumentation for Haystack pipelines | [PyPI](https://pypi.org/project/openinference-instrumentation-haystack/) |
+| **openinference-instrumentation-groq** | Auto-instrumentation for Groq SDK | [PyPI](https://pypi.org/project/openinference-instrumentation-groq/) |
+| **openinference-instrumentation-litellm** | Auto-instrumentation for LiteLLM | [PyPI](https://pypi.org/project/openinference-instrumentation-litellm/) |
+| **openinference-instrumentation-instructor** | Auto-instrumentation for Instructor library | [PyPI](https://pypi.org/project/openinference-instrumentation-instructor/) |
+| **openinference-instrumentation-crewai** | Auto-instrumentation for CrewAI agents | [PyPI](https://pypi.org/project/openinference-instrumentation-crewai/) |
+| **openinference-instrumentation-google-genai** | Auto-instrumentation for Google GenAI | [PyPI](https://pypi.org/project/openinference-instrumentation-google-genai/) |
+| **openinference-instrumentation-google-adk** | Auto-instrumentation for Google ADK | [PyPI](https://pypi.org/project/openinference-instrumentation-google-adk/) |
+| **openinference-instrumentation-pydantic-ai** | Auto-instrumentation for PydanticAI | [PyPI](https://pypi.org/project/openinference-instrumentation-pydantic-ai/) |
+| **openinference-instrumentation-openai-agents** | Auto-instrumentation for OpenAI Agents SDK | [PyPI](https://pypi.org/project/openinference-instrumentation-openai-agents/) |
+| **openinference-instrumentation-autogen** | Auto-instrumentation for Autogen (ag2) | [PyPI](https://pypi.org/project/openinference-instrumentation-autogen/) |
+| **openinference-instrumentation-autogen-agentchat** | Auto-instrumentation for Autogen AgentChat | [PyPI](https://pypi.org/project/openinference-instrumentation-autogen-agentchat/) |
+| **openinference-instrumentation-agent-framework** | Auto-instrumentation for Microsoft Agent Framework | [PyPI](https://pypi.org/project/openinference-instrumentation-agent-framework/) |
+| **openinference-instrumentation-agentspec** | Auto-instrumentation for Agent Spec | [PyPI](https://pypi.org/project/openinference-instrumentation-agentspec/) |
+| **openinference-instrumentation-agno** | Auto-instrumentation for Agno agents | [PyPI](https://pypi.org/project/openinference-instrumentation-agno/) |
+| **openinference-instrumentation-smolagents** | Auto-instrumentation for smolagents | [PyPI](https://pypi.org/project/openinference-instrumentation-smolagents/) |
+| **openinference-instrumentation-strands-agents** | Auto-instrumentation for Strands Agents | [PyPI](https://pypi.org/project/openinference-instrumentation-strands-agents/) |
+| **openinference-instrumentation-beeai** | Auto-instrumentation for BeeAI | [PyPI](https://pypi.org/project/openinference-instrumentation-beeai/) |
+| **openinference-instrumentation-guardrails** | Auto-instrumentation for Guardrails | [PyPI](https://pypi.org/project/openinference-instrumentation-guardrails/) |
+| **openinference-instrumentation-openllmetry** | Converts OpenLLMetry traces to OpenInference | [PyPI](https://pypi.org/project/openinference-instrumentation-openllmetry/) |
+| **openinference-instrumentation-openlit** | Auto-instrumentation for OpenLit | [PyPI](https://pypi.org/project/openinference-instrumentation-openlit/) |
+| **openinference-instrumentation-pipecat** | Auto-instrumentation for Pipecat | [PyPI](https://pypi.org/project/openinference-instrumentation-pipecat/) |
+| **openinference-instrumentation-portkey** | Auto-instrumentation for Portkey | [PyPI](https://pypi.org/project/openinference-instrumentation-portkey/) |
+| **openinference-instrumentation-mcp** | Auto-instrumentation for MCP SDK (context propagation) | [PyPI](https://pypi.org/project/openinference-instrumentation-mcp/) |
+| **openinference-instrumentation-promptflow** | Auto-instrumentation for PromptFlow | [PyPI](https://pypi.org/project/openinference-instrumentation-promptflow/) |
+
+## Getting Started
+
+All instrumentations follow a similar pattern:
+
+1. **Install** the instrumentation package
+2. **Configure** the OpenTelemetry tracer provider
+3. **Instrument** your application
+4. **Run** your code and view traces
+
+### Basic Example
+
+```python
+from openinference.instrumentation.<package> import <Package>Instrumentor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+# Configure tracer
+endpoint = "http://127.0.0.1:6006/v1/traces"
+tracer_provider = trace_sdk.TracerProvider()
+tracer_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter(endpoint)))
+
+# Instrument
+<Package>Instrumentor().instrument(tracer_provider=tracer_provider)
+
+# Your application code here
+```
+
+## Common Features
+
+All OpenInference instrumentations support:
+
+- **Session tracking** - Track user sessions across multiple requests
+- **User identification** - Associate traces with specific users
+- **Metadata and tags** - Add custom metadata and tags to traces
+- **Prompt template tracking** - Track prompt templates and variables
+- **PII masking** - Configure trace masking for sensitive data
+- **Context propagation** - Automatic propagation of tracing context
+
+### Using Context Attributes
+
+```python
+from openinference.instrumentation import using_attributes
+
+with using_attributes(
+    session_id="my-session-id",
+    user_id="user-123",
+    metadata={"key": "value"},
+    tags=["production", "feature-x"],
+):
+    # Your instrumented code here
+    pass
+```
+
+## Additional Resources
+
+- [OpenInference Specification](https://github.com/Arize-ai/openinference)
+- [OpenInference and Phoenix Documentation](https://docs.arize.com/phoenix)
+- [Customizing Spans](https://github.com/Arize-ai/openinference/tree/main/python/openinference-instrumentation#customizing-spans)
+- [Tracing Configuration (PII Masking)](https://github.com/Arize-ai/openinference/tree/main/python/openinference-instrumentation#tracing-configuration)
+
+## Contributing
+
+To contribute a new instrumentation or report issues, visit the [OpenInference GitHub repository](https://github.com/Arize-ai/openinference).

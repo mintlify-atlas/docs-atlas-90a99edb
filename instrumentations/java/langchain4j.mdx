@@ -1,0 +1,306 @@
+---
+title: LangChain4j Instrumentation
+description: Instrument LangChain4j applications with OpenInference
+---
+
+OpenInference provides automatic instrumentation for [LangChain4j](https://github.com/langchain4j/langchain4j) applications, enabling you to trace LLM calls, model parameters, token usage, and more using OpenTelemetry.
+
+## Installation
+
+### Gradle
+
+Add the following to your `build.gradle`:
+
+```gradle
+dependencies {
+    implementation 'com.arize:openinference-instrumentation-langchain4j:0.1.5'
+    implementation 'dev.langchain4j:langchain4j-core:1.0.0'
+}
+```
+
+### Maven
+
+Add the following to your `pom.xml`:
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>com.arize</groupId>
+        <artifactId>openinference-instrumentation-langchain4j</artifactId>
+        <version>0.1.5</version>
+    </dependency>
+    <dependency>
+        <groupId>dev.langchain4j</groupId>
+        <artifactId>langchain4j-core</artifactId>
+        <version>1.0.0</version>
+    </dependency>
+</dependencies>
+```
+
+## Requirements
+
+- Java 11 or higher
+- OpenTelemetry Java 1.49.0 or higher
+- LangChain4j 1.0.0 or higher
+
+## Quick Start
+
+### Automatic Instrumentation
+
+Instrument your LangChain4j application with a single line of code:
+
+```java
+import com.arize.instrumentation.langchain4j.LangChain4jInstrumentor;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+
+public class MyApp {
+    public static void main(String[] args) {
+        // Initialize OpenTelemetry (see below for full setup)
+        initializeOpenTelemetry();
+        
+        // Enable automatic instrumentation
+        LangChain4jInstrumentor.instrument();
+        
+        // Use LangChain4j as normal - traces are automatically captured
+        OpenAiChatModel model = OpenAiChatModel.builder()
+            .apiKey(System.getenv("OPENAI_API_KEY"))
+            .modelName("gpt-4")
+            .temperature(0.7)
+            .build();
+        
+        String response = model.generate("What is the capital of France?");
+        System.out.println(response);
+    }
+}
+```
+
+### Manual Instrumentation with Model Listener
+
+For more control, register a model listener directly:
+
+```java
+import com.arize.instrumentation.langchain4j.LangChain4jInstrumentor;
+import com.arize.instrumentation.langchain4j.LangChain4jModelListener;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+
+public class MyApp {
+    public static void main(String[] args) {
+        initializeOpenTelemetry();
+        
+        LangChain4jInstrumentor instrumentor = LangChain4jInstrumentor.instrument();
+        LangChain4jModelListener listener = instrumentor.createModelListener();
+        
+        OpenAiChatModel model = OpenAiChatModel.builder()
+            .apiKey(System.getenv("OPENAI_API_KEY"))
+            .modelName("gpt-4")
+            .listeners(List.of(listener))
+            .build();
+        
+        String response = model.generate("Tell me a joke");
+        System.out.println(response);
+    }
+}
+```
+
+## OpenTelemetry Setup
+
+### Basic Setup with Phoenix
+
+```java
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+import java.time.Duration;
+
+public class OpenTelemetryConfig {
+    public static void initializeOpenTelemetry() {
+        // Create resource with service information
+        Resource resource = Resource.getDefault()
+            .merge(Resource.create(Attributes.of(
+                AttributeKey.stringKey("service.name"), "my-langchain4j-app",
+                AttributeKey.stringKey("service.version"), "1.0.0"
+            )));
+        
+        // Create OTLP exporter for Phoenix
+        OtlpGrpcSpanExporter otlpExporter = OtlpGrpcSpanExporter.builder()
+            .setEndpoint("http://localhost:4317")
+            .setTimeout(Duration.ofSeconds(10))
+            .build();
+        
+        // Create tracer provider with batch processor
+        SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
+            .addSpanProcessor(BatchSpanProcessor.builder(otlpExporter)
+                .setScheduleDelay(Duration.ofSeconds(1))
+                .build())
+            .setResource(resource)
+            .build();
+        
+        // Register global OpenTelemetry instance
+        OpenTelemetrySdk.builder()
+            .setTracerProvider(tracerProvider)
+            .buildAndRegisterGlobal();
+    }
+}
+```
+
+### With Authentication (Phoenix Cloud)
+
+```java
+import java.util.Map;
+
+OtlpGrpcSpanExporter otlpExporter = OtlpGrpcSpanExporter.builder()
+    .setEndpoint("https://your-phoenix-instance.com:4317")
+    .setHeaders(() -> Map.of(
+        "Authorization", "Bearer " + System.getenv("PHOENIX_API_KEY")
+    ))
+    .build();
+```
+
+## Configuration
+
+### Custom Trace Configuration
+
+Control what information is captured in traces:
+
+```java
+import com.arize.instrumentation.TraceConfig;
+import com.arize.instrumentation.langchain4j.LangChain4jInstrumentor;
+
+// Configure trace options
+TraceConfig config = TraceConfig.builder()
+    .hideInputMessages(false)   // Set to true to hide input messages
+    .hideOutputMessages(false)  // Set to true to hide output messages
+    .build();
+
+// Instrument with custom configuration
+LangChain4jInstrumentor.instrument(config);
+```
+
+### With Custom Tracer Provider
+
+```java
+import io.opentelemetry.api.trace.TracerProvider;
+import com.arize.instrumentation.langchain4j.LangChain4jInstrumentor;
+
+TracerProvider tracerProvider = // your custom tracer provider
+LangChain4jInstrumentor.instrument(tracerProvider);
+```
+
+## Complete Example
+
+Here's a complete example with tool calling:
+
+```java
+import com.arize.instrumentation.langchain4j.LangChain4jInstrumentor;
+import dev.langchain4j.agent.tool.Tool;
+import dev.langchain4j.agent.tool.P;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.data.message.UserMessage;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+
+public class WeatherAssistant {
+    
+    static class WeatherTools {
+        @Tool("Returns the weather forecast for a given city")
+        String getWeather(@P("The city name") String city) {
+            return "The weather in " + city + " is 72°F and sunny";
+        }
+    }
+    
+    public static void main(String[] args) {
+        // Initialize OpenTelemetry
+        initializeOpenTelemetry();
+        
+        // Enable instrumentation
+        LangChain4jInstrumentor instrumentor = LangChain4jInstrumentor.instrument();
+        
+        // Create model with tools
+        OpenAiChatModel model = OpenAiChatModel.builder()
+            .apiKey(System.getenv("OPENAI_API_KEY"))
+            .modelName("gpt-4")
+            .listeners(List.of(instrumentor.createModelListener()))
+            .build();
+        
+        // Make a request with tool calling
+        var response = model.chat(
+            UserMessage.from("What's the weather like in Paris?")
+        );
+        
+        System.out.println("Response: " + response.aiMessage().text());
+    }
+}
+```
+
+## Captured Trace Data
+
+The instrumentation automatically captures:
+
+- **LLM Model Information**: Model name, provider (OpenAI, etc.)
+- **Input Messages**: User prompts, system messages, conversation history
+- **Output Messages**: Model responses, assistant messages
+- **Invocation Parameters**: Temperature, max tokens, top_p, etc.
+- **Token Usage**: Prompt tokens, completion tokens, total tokens
+- **Tool Calls**: Function names, arguments, and results
+- **Timing Information**: Request latency and duration
+- **Error Information**: Exceptions and error messages
+
+## Viewing Traces
+
+### Using Phoenix
+
+1. Start Phoenix locally:
+   ```bash
+   docker run -p 6006:6006 -p 4317:4317 arizephoenix/phoenix:latest
+   ```
+
+2. Run your instrumented application
+
+3. View traces at [http://localhost:6006](http://localhost:6006)
+
+### Using Other Backends
+
+OpenInference instrumentation works with any OpenTelemetry-compatible backend:
+
+- **Jaeger**: Change the OTLP endpoint to your Jaeger instance
+- **Zipkin**: Use the Zipkin exporter instead of OTLP
+- **Cloud Providers**: AWS X-Ray, Google Cloud Trace, Azure Monitor
+
+## Best Practices
+
+1. **Initialize Once**: Call `LangChain4jInstrumentor.instrument()` once at application startup
+2. **Set Service Name**: Always set a meaningful `service.name` in your OpenTelemetry resource
+3. **Use Batch Processing**: Use `BatchSpanProcessor` for better performance in production
+4. **Handle Secrets**: Never log API keys or sensitive data in traces
+5. **Flush on Shutdown**: Call `tracerProvider.forceFlush()` before application exit to ensure all spans are sent
+
+## Troubleshooting
+
+### No traces appearing
+
+- Verify OpenTelemetry is initialized before calling `instrument()`
+- Check that your OTLP endpoint is accessible
+- Ensure `forceFlush()` is called before application exit
+- Enable debug logging: `System.setProperty("otel.logs.exporter", "console")`
+
+### Duplicate instrumentation error
+
+```
+java.lang.IllegalStateException: LangChain4j is already instrumented
+```
+
+Solution: Only call `LangChain4jInstrumentor.instrument()` once per application lifecycle.
+
+### Missing token counts
+
+Token counts are only available when the LLM provider returns usage metadata. Not all providers include this information.
+
+## Resources
+
+- [LangChain4j Documentation](https://docs.langchain4j.dev/)
+- [OpenTelemetry Java Documentation](https://opentelemetry.io/docs/instrumentation/java/)
+- [OpenInference Semantic Conventions](/semantic-conventions)
+- [Example Applications](https://github.com/Arize-ai/openinference/tree/main/java/examples)

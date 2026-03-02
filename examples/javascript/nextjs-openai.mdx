@@ -1,0 +1,351 @@
+---
+title: Next.js with OpenAI
+description: Build a Next.js chat application with OpenAI and OpenInference
+---
+
+This example demonstrates how to build a Next.js application with OpenAI integration and OpenInference instrumentation.
+
+## Prerequisites
+
+- Node.js 18+
+- OpenAI API key
+- Phoenix or another OpenTelemetry collector
+
+## Installation
+
+<Steps>
+  <Step title="Create Next.js app">
+    ```bash
+    npx create-next-app@latest my-chat-app
+    cd my-chat-app
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    npm install openai \
+      @arizeai/openinference-instrumentation-openai \
+      @opentelemetry/sdk-trace-node \
+      @opentelemetry/exporter-trace-otlp-proto
+    ```
+  </Step>
+
+  <Step title="Set environment variables">
+    Create a `.env.local` file:
+    ```bash
+    OPENAI_API_KEY="your-api-key"
+    COLLECTOR_ENDPOINT="http://localhost:6006/v1/traces"
+    ```
+  </Step>
+</Steps>
+
+## Instrumentation Setup
+
+Next.js requires a specific instrumentation pattern using the `instrumentation` hook.
+
+### Create Root Instrumentation File
+
+Create `instrumentation.ts` in the root directory:
+
+```typescript
+export async function register() {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    await import("./instrumentation-node");
+  }
+}
+```
+
+### Create Node.js Instrumentation
+
+Create `instrumentation-node.ts`:
+
+```typescript
+import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai";
+import * as OpenAI from "openai";
+import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { Resource } from "@opentelemetry/resources";
+
+// For troubleshooting, set the log level to DiagLogLevel.DEBUG
+diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
+
+const provider = new NodeTracerProvider({
+  resource: new Resource({
+    ["openinference.project.name"]: "nextjs-chat",
+  }),
+});
+
+provider.addSpanProcessor(
+  new SimpleSpanProcessor(
+    new OTLPTraceExporter({
+      url: process.env.COLLECTOR_ENDPOINT || "http://localhost:6006/v1/traces",
+    }),
+  ),
+);
+
+// OpenAI must be manually instrumented as it doesn't have a traditional module structure
+const openAIInstrumentation = new OpenAIInstrumentation({});
+openAIInstrumentation.manuallyInstrument(OpenAI);
+
+registerInstrumentations({
+  instrumentations: [openAIInstrumentation],
+});
+
+provider.register();
+
+diag.info("👀 OpenInference initialized");
+```
+
+### Enable Instrumentation in Next.js Config
+
+Update `next.config.js`:
+
+```javascript
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Enable experimental instrumentation
+  experimental: {
+    instrumentationHook: true,
+  },
+};
+
+module.exports = nextConfig;
+```
+
+## API Route
+
+Create `app/api/chat/route.ts`:
+
+```typescript
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function POST(request: NextRequest) {
+  try {
+    const { messages } = await request.json();
+
+    if (!messages || !Array.isArray(messages)) {
+      return NextResponse.json(
+        { error: "Messages array is required" },
+        { status: 400 }
+      );
+    }
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: messages,
+      temperature: 0.7,
+      max_tokens: 500,
+    });
+
+    return NextResponse.json({
+      message: response.choices[0].message,
+    });
+  } catch (error) {
+    console.error("Error in chat API:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## Streaming API Route
+
+For streaming responses, create `app/api/chat/stream/route.ts`:
+
+```typescript
+import { NextRequest } from "next/server";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function POST(request: NextRequest) {
+  try {
+    const { messages } = await request.json();
+
+    const stream = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: messages,
+      temperature: 0.7,
+      max_tokens: 500,
+      stream: true,
+    });
+
+    // Create a readable stream
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content || "";
+            controller.enqueue(encoder.encode(content));
+          }
+          controller.close();
+        } catch (error) {
+          controller.error(error);
+        }
+      },
+    });
+
+    return new Response(readable, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+      },
+    });
+  } catch (error) {
+    console.error("Error in streaming chat API:", error);
+    return new Response("Internal server error", { status: 500 });
+  }
+}
+```
+
+## Chat UI Component
+
+Create `app/components/chat.tsx`:
+
+```typescript
+"use client";
+
+import { useState } from "react";
+
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export function Chat() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+
+    const userMessage: Message = { role: "user", content: input };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, userMessage],
+        }),
+      });
+
+      const data = await response.json();
+      setMessages((prev) => [...prev, data.message]);
+    } catch (error) {
+      console.error("Error sending message:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-screen max-w-2xl mx-auto p-4">
+      <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+        {messages.map((message, index) => (
+          <div
+            key={index}
+            className={`p-4 rounded-lg ${
+              message.role === "user"
+                ? "bg-blue-100 ml-auto max-w-[80%]"
+                : "bg-gray-100 mr-auto max-w-[80%]"
+            }`}
+          >
+            <p className="text-sm font-semibold mb-1">
+              {message.role === "user" ? "You" : "Assistant"}
+            </p>
+            <p>{message.content}</p>
+          </div>
+        ))}
+        {loading && (
+          <div className="bg-gray-100 p-4 rounded-lg mr-auto max-w-[80%]">
+            <p className="text-sm font-semibold mb-1">Assistant</p>
+            <p className="text-gray-500">Thinking...</p>
+          </div>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+          placeholder="Type your message..."
+          className="flex-1 p-2 border rounded"
+          disabled={loading}
+        />
+        <button
+          onClick={sendMessage}
+          disabled={loading}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+        >
+          Send
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+## Main Page
+
+Update `app/page.tsx`:
+
+```typescript
+import { Chat } from "./components/chat";
+
+export default function Home() {
+  return (
+    <main>
+      <h1 className="text-2xl font-bold text-center py-4">
+        Next.js Chat with OpenInference
+      </h1>
+      <Chat />
+    </main>
+  );
+}
+```
+
+## Run the Application
+
+```bash
+npm run dev
+```
+
+Visit http://localhost:3000 to use the chat interface.
+
+## Key Features
+
+### Automatic Instrumentation
+
+Next.js instrumentation hook automatically initializes tracing before your application code runs.
+
+### Server-Side Only
+
+Instrumentation only runs in the Node.js runtime (server-side), not in the browser.
+
+### API Routes
+
+Both standard and streaming API routes are automatically traced.
+
+## Next Steps
+
+- Add [authentication](/examples/javascript/nextjs-auth)
+- Implement [rate limiting](/examples/javascript/api-rate-limiting)
+- Explore [Vercel AI SDK](/examples/javascript/vercel-ai-sdk)

@@ -1,0 +1,489 @@
+---
+title: Spring AI Instrumentation
+description: Instrument Spring AI applications with OpenInference
+---
+
+OpenInference provides instrumentation for [Spring AI](https://spring.io/projects/spring-ai) applications using Spring's Micrometer Observation API. This enables you to trace LLM calls, model parameters, token usage, and more using OpenTelemetry.
+
+## Installation
+
+### Gradle
+
+Add the following to your `build.gradle`:
+
+```gradle
+dependencies {
+    implementation 'com.arize:openinference-instrumentation-springAI:0.1.0'
+    implementation 'org.springframework.ai:spring-ai-model:1.0.1'
+    implementation 'io.micrometer:micrometer-observation:1.15.1'
+}
+```
+
+### Maven
+
+Add the following to your `pom.xml`:
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>com.arize</groupId>
+        <artifactId>openinference-instrumentation-springAI</artifactId>
+        <version>0.1.0</version>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.ai</groupId>
+        <artifactId>spring-ai-model</artifactId>
+        <version>1.0.1</version>
+    </dependency>
+    <dependency>
+        <groupId>io.micrometer</groupId>
+        <artifactId>micrometer-observation</artifactId>
+        <version>1.15.1</version>
+    </dependency>
+</dependencies>
+```
+
+## Requirements
+
+- Java 17 or higher
+- Spring AI 1.0.0 or higher
+- OpenTelemetry Java 1.49.0 or higher
+- Micrometer Observation 1.15.0 or higher
+
+## Quick Start
+
+### Basic Setup
+
+```java
+import com.arize.instrumentation.OITracer;
+import com.arize.instrumentation.TraceConfig;
+import com.arize.instrumentation.springAI.SpringAIInstrumentor;
+import io.micrometer.observation.ObservationRegistry;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
+
+public class MySpringAIApp {
+    public static void main(String[] args) {
+        // Initialize OpenTelemetry
+        SdkTracerProvider tracerProvider = initializeOpenTelemetry();
+        
+        // Create OITracer
+        OITracer tracer = new OITracer(
+            tracerProvider.get("com.mycompany.my-app"),
+            TraceConfig.getDefault()
+        );
+        
+        // Register SpringAI instrumentation with Micrometer
+        ObservationRegistry registry = ObservationRegistry.create();
+        registry.observationConfig()
+            .observationHandler(new SpringAIInstrumentor(tracer));
+        
+        // Configure OpenAI chat model
+        OpenAiApi openAiApi = OpenAiApi.builder()
+            .apiKey(System.getenv("OPENAI_API_KEY"))
+            .build();
+        
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+            .model("gpt-4")
+            .temperature(0.7)
+            .maxTokens(200)
+            .build();
+        
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+            .openAiApi(openAiApi)
+            .defaultOptions(options)
+            .observationRegistry(registry)  // Register the observation registry
+            .build();
+        
+        // Use the model - traces are automatically captured
+        ChatResponse response = chatModel.call(
+            new Prompt("What is the capital of France?")
+        );
+        
+        System.out.println(response.getResult().getOutput());
+    }
+}
+```
+
+## OpenTelemetry Setup
+
+### Basic Setup with Phoenix
+
+```java
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+import java.time.Duration;
+
+public static SdkTracerProvider initializeOpenTelemetry() {
+    // Create resource with service information
+    Resource resource = Resource.getDefault()
+        .merge(Resource.create(Attributes.of(
+            AttributeKey.stringKey("service.name"), "spring-ai-app",
+            AttributeKey.stringKey("service.version"), "1.0.0"
+        )));
+    
+    // Create OTLP exporter for Phoenix
+    OtlpGrpcSpanExporter otlpExporter = OtlpGrpcSpanExporter.builder()
+        .setEndpoint("http://localhost:4317")
+        .setTimeout(Duration.ofSeconds(10))
+        .build();
+    
+    // Create and configure tracer provider
+    SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
+        .addSpanProcessor(BatchSpanProcessor.builder(otlpExporter)
+            .setScheduleDelay(Duration.ofSeconds(1))
+            .build())
+        .setResource(resource)
+        .build();
+    
+    // Register global OpenTelemetry instance
+    OpenTelemetrySdk.builder()
+        .setTracerProvider(tracerProvider)
+        .buildAndRegisterGlobal();
+    
+    return tracerProvider;
+}
+```
+
+## Configuration
+
+### Custom Trace Configuration
+
+Control what information is captured in traces:
+
+```java
+import com.arize.instrumentation.TraceConfig;
+
+// Configure what to hide in traces
+TraceConfig config = TraceConfig.builder()
+    .hideInputMessages(false)   // Set to true to hide input messages
+    .hideOutputMessages(false)  // Set to true to hide output messages
+    .build();
+
+OITracer tracer = new OITracer(
+    tracerProvider.get("my-app"),
+    config
+);
+```
+
+### Chat Options
+
+Configure model parameters:
+
+```java
+import org.springframework.ai.openai.OpenAiChatOptions;
+
+OpenAiChatOptions options = OpenAiChatOptions.builder()
+    .model("gpt-4")
+    .temperature(0.7)
+    .maxTokens(500)
+    .topP(0.9)
+    .build();
+
+OpenAiChatModel chatModel = OpenAiChatModel.builder()
+    .openAiApi(openAiApi)
+    .defaultOptions(options)
+    .observationRegistry(registry)
+    .build();
+```
+
+## Spring Boot Integration
+
+### Application Configuration
+
+```java
+import com.arize.instrumentation.OITracer;
+import com.arize.instrumentation.TraceConfig;
+import com.arize.instrumentation.springAI.SpringAIInstrumentor;
+import io.micrometer.observation.ObservationRegistry;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+
+@SpringBootApplication
+public class Application {
+    
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+    
+    @Bean
+    public ObservationRegistry observationRegistry() {
+        // Create OITracer
+        OITracer tracer = new OITracer(
+            GlobalOpenTelemetry.getTracer("spring-ai-app"),
+            TraceConfig.getDefault()
+        );
+        
+        // Create and configure registry
+        ObservationRegistry registry = ObservationRegistry.create();
+        registry.observationConfig()
+            .observationHandler(new SpringAIInstrumentor(tracer));
+        
+        return registry;
+    }
+}
+```
+
+### Service Example
+
+```java
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ChatService {
+    
+    private final ChatModel chatModel;
+    
+    public ChatService(ChatModel chatModel) {
+        this.chatModel = chatModel;
+    }
+    
+    public String chat(String message) {
+        ChatResponse response = chatModel.call(new Prompt(message));
+        return response.getResult().getOutput().getText();
+    }
+}
+```
+
+## Tool Calling (Function Calling)
+
+Spring AI supports function calling with automatic tracing:
+
+```java
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.function.FunctionToolCallback;
+import java.util.function.Function;
+
+public class WeatherExample {
+    
+    public record WeatherRequest(String location, String unit) {}
+    public record WeatherResponse(double temperature, String unit) {}
+    
+    static class WeatherService implements Function<WeatherRequest, WeatherResponse> {
+        public WeatherResponse apply(WeatherRequest request) {
+            // Simulate weather API call
+            return new WeatherResponse(72.5, "F");
+        }
+    }
+    
+    public static void main(String[] args) {
+        // Setup OpenTelemetry and registry (as shown above)
+        SdkTracerProvider tracerProvider = initializeOpenTelemetry();
+        ObservationRegistry registry = createObservationRegistry(tracerProvider);
+        
+        // Create tool callback
+        ToolCallback weatherTool = FunctionToolCallback.builder(
+            "currentWeather",
+            new WeatherService()
+        )
+        .description("Get the current weather in a location")
+        .inputType(WeatherRequest.class)
+        .build();
+        
+        // Configure model with tools
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+            .model("gpt-4")
+            .temperature(0.4)
+            .toolCallbacks(weatherTool)
+            .build();
+        
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+            .openAiApi(openAiApi)
+            .defaultOptions(options)
+            .observationRegistry(registry)
+            .build();
+        
+        // Ask a question that requires tool calling
+        ChatResponse response = chatModel.call(
+            new Prompt("What's the weather like in San Francisco?")
+        );
+        
+        System.out.println(response.getResult().getOutput());
+    }
+}
+```
+
+## Captured Trace Data
+
+The instrumentation automatically captures:
+
+- **LLM Model Information**: Model name, provider
+- **Input Messages**: User prompts, system messages, conversation history
+- **Output Messages**: Model responses, assistant messages
+- **Invocation Parameters**: Temperature, max tokens, top_p, etc.
+- **Token Usage**: Prompt tokens, completion tokens, total tokens
+- **Tool Calls**: Function names, arguments, and responses
+- **Message Roles**: System, user, assistant, tool
+- **Timing Information**: Request latency and duration
+- **Error Information**: Exceptions and error messages
+
+## Multi-turn Conversations
+
+Trace complete conversations with context:
+
+```java
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.Prompt;
+
+// First turn
+Prompt prompt1 = new Prompt("What is the capital of France?");
+ChatResponse response1 = chatModel.call(prompt1);
+
+// Second turn with context
+Prompt prompt2 = Prompt.builder()
+    .messages(
+        new UserMessage("What is the capital of France?"),
+        response1.getResult().getOutput(),
+        new UserMessage("What about Germany?")
+    )
+    .build();
+
+ChatResponse response2 = chatModel.call(prompt2);
+```
+
+## Viewing Traces
+
+### Using Phoenix
+
+1. Start Phoenix locally:
+   ```bash
+   docker run -p 6006:6006 -p 4317:4317 arizephoenix/phoenix:latest
+   ```
+
+2. Run your instrumented application
+
+3. View traces at [http://localhost:6006](http://localhost:6006)
+
+### Using Other Backends
+
+OpenInference instrumentation works with any OpenTelemetry-compatible backend:
+
+- **Jaeger**: Change the OTLP endpoint to your Jaeger instance
+- **Zipkin**: Use the Zipkin exporter
+- **Cloud Providers**: AWS X-Ray, Google Cloud Trace, Azure Monitor
+
+## Best Practices
+
+1. **Singleton Registry**: Create a single `ObservationRegistry` instance and reuse it across your application
+2. **Spring Boot Integration**: Use Spring's dependency injection for `ObservationRegistry`
+3. **Set Service Name**: Always set a meaningful `service.name` in your OpenTelemetry resource
+4. **Use Batch Processing**: Use `BatchSpanProcessor` for better performance
+5. **Handle Secrets**: Never log API keys in traces
+6. **Graceful Shutdown**: Flush spans before application shutdown
+
+## Troubleshooting
+
+### No traces appearing
+
+- Verify the `ObservationRegistry` is properly configured with `SpringAIInstrumentor`
+- Ensure the registry is passed to your `ChatModel` via `.observationRegistry()`
+- Check that your OTLP endpoint is accessible
+- Enable debug logging for Spring AI observations
+
+### Missing token counts
+
+Token usage is only available when the model provider returns usage metadata in the response.
+
+### Tool calls not traced
+
+Ensure you're using Spring AI 1.0.0 or higher, which includes observation support for tool calls.
+
+## Complete Example
+
+Here's a complete example with tool calling and conversation context:
+
+```java
+import com.arize.instrumentation.OITracer;
+import com.arize.instrumentation.TraceConfig;
+import com.arize.instrumentation.springAI.SpringAIInstrumentor;
+import io.micrometer.observation.ObservationRegistry;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
+
+public class CompleteExample {
+    public static void main(String[] args) {
+        // 1. Initialize OpenTelemetry
+        Resource resource = Resource.getDefault().merge(
+            Resource.create(Attributes.builder()
+                .put("service.name", "spring-ai-example")
+                .build())
+        );
+        
+        SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
+            .setResource(resource)
+            .build();
+        
+        OpenTelemetrySdk.builder()
+            .setTracerProvider(tracerProvider)
+            .buildAndRegisterGlobal();
+        
+        // 2. Create OITracer and register with Micrometer
+        OITracer tracer = new OITracer(
+            tracerProvider.get("spring-ai"),
+            TraceConfig.getDefault()
+        );
+        
+        ObservationRegistry registry = ObservationRegistry.create();
+        registry.observationConfig()
+            .observationHandler(new SpringAIInstrumentor(tracer));
+        
+        // 3. Configure and create chat model
+        OpenAiApi api = OpenAiApi.builder()
+            .apiKey(System.getenv("OPENAI_API_KEY"))
+            .build();
+        
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+            .model("gpt-4")
+            .temperature(0.7)
+            .build();
+        
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+            .openAiApi(api)
+            .defaultOptions(options)
+            .observationRegistry(registry)
+            .build();
+        
+        // 4. Use the model
+        ChatResponse response = chatModel.call(
+            new Prompt("Explain quantum computing in one sentence.")
+        );
+        
+        System.out.println(response.getResult().getOutput());
+        
+        // 5. Shutdown and flush traces
+        tracerProvider.forceFlush();
+        tracerProvider.shutdown();
+    }
+}
+```
+
+## Resources
+
+- [Spring AI Documentation](https://docs.spring.io/spring-ai/reference/)
+- [Micrometer Observation](https://micrometer.io/docs/observation)
+- [OpenTelemetry Java Documentation](https://opentelemetry.io/docs/instrumentation/java/)
+- [OpenInference Semantic Conventions](/semantic-conventions)
+- [Example Applications](https://github.com/Arize-ai/openinference/tree/main/java/examples)

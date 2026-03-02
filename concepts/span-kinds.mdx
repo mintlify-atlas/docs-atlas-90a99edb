@@ -1,0 +1,362 @@
+---
+title: Span Kinds
+description: All OpenInference span kinds with detailed descriptions and examples
+---
+
+The `openinference.span.kind` attribute is **REQUIRED** for all OpenInference spans and identifies the type of operation being traced. The span kind provides a hint to the tracing backend as to how the trace should be assembled and visualized.
+
+<Note>
+  The `openinference.span.kind` attribute is distinct from OpenTelemetry's `span_kind` field. The OpenTelemetry `span_kind` is usually set to `SPAN_KIND_INTERNAL`, while `openinference.span.kind` provides AI-specific classification.
+</Note>
+
+## LLM
+
+A span that represents a call to a Large Language Model (LLM).
+
+**Example use cases:**
+- Call to OpenAI for chat completions
+- Call to Anthropic Claude
+- Call to Llama for text generation
+- Any language model API invocation
+
+**Required attributes:**
+- `openinference.span.kind`: `"LLM"`
+- `llm.system`: The AI system/product (e.g., "openai", "anthropic")
+
+**Common attributes:**
+- `llm.model_name`: Model identifier (e.g., "gpt-4-0613")
+- `llm.input_messages`: Input messages array
+- `llm.output_messages`: Output messages array
+- `llm.token_count.*`: Token usage metrics
+- `llm.invocation_parameters`: Model parameters (temperature, max_tokens, etc.)
+
+```json Example
+{
+    "attributes": {
+        "openinference.span.kind": "LLM",
+        "llm.system": "openai",
+        "llm.model_name": "gpt-4-0613",
+        "llm.token_count.prompt": 229,
+        "llm.token_count.completion": 21,
+        "llm.token_count.total": 250
+    }
+}
+```
+
+<Accordion title="View LLM span specification">
+  See the [LLM Spans specification](/api-reference/llm-spans) for complete details on LLM-specific attributes.
+</Accordion>
+
+---
+
+## EMBEDDING
+
+A span that represents a call to an LLM or embedding service for generating embeddings.
+
+**Example use cases:**
+- Call to OpenAI to get text-embedding-3-small embeddings
+- Call to Cohere for embedding generation
+- Generating embeddings for retrieval or similarity search
+
+**Required attributes:**
+- `openinference.span.kind`: `"EMBEDDING"`
+
+**Common attributes:**
+- `embedding.model_name`: Embedding model name
+- `embedding.embeddings`: Array of embedding objects
+- `embedding.invocation_parameters`: Model parameters
+- `llm.token_count.prompt`: Number of tokens in input
+
+```json Example
+{
+    "attributes": {
+        "openinference.span.kind": "EMBEDDING",
+        "embedding.model_name": "text-embedding-3-small",
+        "embedding.embeddings.0.embedding.text": "hello world",
+        "embedding.embeddings.0.embedding.vector": [0.1, 0.2, 0.3],
+        "llm.token_count.prompt": 2
+    }
+}
+```
+
+<Note>
+  Unlike LLM spans, embedding spans use `embedding.model_name` instead of `llm.system` and `llm.provider`.
+</Note>
+
+---
+
+## CHAIN
+
+A span that represents a starting point or a link between different LLM application steps.
+
+**Example use cases:**
+- The beginning of a request to an LLM application
+- Glue code that passes context from a retriever to an LLM call
+- Orchestration logic connecting multiple operations
+- Prompt formatting and post-processing
+- Deterministic sequences of operations
+
+```json Example
+{
+    "attributes": {
+        "openinference.span.kind": "CHAIN",
+        "input.value": "What is the weather in San Francisco?",
+        "input.mime_type": "text/plain",
+        "output.value": "The weather in San Francisco is 72°F and sunny.",
+        "output.mime_type": "text/plain"
+    }
+}
+```
+
+<Info>
+  CHAIN spans often serve as root spans for traces, representing the overall operation before breaking down into sub-operations.
+</Info>
+
+---
+
+## RETRIEVER
+
+A span that represents a data retrieval step.
+
+**Example use cases:**
+- Call to a vector store (Pinecone, Weaviate, Chroma)
+- Query to a traditional database
+- Search engine query
+- Document or knowledge base lookup
+
+**Common attributes:**
+- `retrieval.documents`: Array of retrieved documents
+- `document.id`: Document identifier
+- `document.content`: Document text content
+- `document.score`: Relevance score
+- `document.metadata`: Additional document metadata
+
+```json Example
+{
+    "attributes": {
+        "openinference.span.kind": "RETRIEVER",
+        "retrieval.documents.0.document.id": "doc_123",
+        "retrieval.documents.0.document.content": "San Francisco weather data...",
+        "retrieval.documents.0.document.score": 0.95,
+        "retrieval.documents.1.document.id": "doc_456",
+        "retrieval.documents.1.document.content": "California climate information...",
+        "retrieval.documents.1.document.score": 0.87
+    }
+}
+```
+
+---
+
+## RERANKER
+
+A span that represents the reranking of a set of input documents.
+
+**Example use cases:**
+- Cross-encoder computing relevance scores
+- Reordering retrieved documents by relevance to a query
+- Selecting top K documents from a larger candidate set
+
+**Common attributes:**
+- `reranker.input_documents`: Documents before reranking
+- `reranker.output_documents`: Documents after reranking
+- `reranker.query`: The query used for reranking
+- `reranker.model_name`: Reranking model identifier
+- `reranker.top_k`: Number of top documents to return
+
+```json Example
+{
+    "attributes": {
+        "openinference.span.kind": "RERANKER",
+        "reranker.model_name": "cross-encoder/ms-marco-MiniLM-L-12-v2",
+        "reranker.query": "How to format timestamp?",
+        "reranker.top_k": 3,
+        "reranker.input_documents.0.document.score": 0.85,
+        "reranker.output_documents.0.document.score": 0.95
+    }
+}
+```
+
+<Info>
+  Rerankers typically receive documents from a RETRIEVER span and pass refined results to an LLM span.
+</Info>
+
+---
+
+## TOOL
+
+A span that represents a call to an external tool such as a calculator, weather API, or any function execution.
+
+**Example use cases:**
+- Function called by an LLM (function calling)
+- External API invocation (weather, database, search)
+- Calculator or computation tool
+- Custom business logic execution
+
+**Common attributes:**
+- `tool.name`: Name of the tool
+- `tool.description`: Purpose of the tool
+- `tool.parameters`: Parameter definitions (JSON schema)
+- `input.value`: Tool input arguments
+- `output.value`: Tool execution result
+
+```json Example
+{
+    "attributes": {
+        "openinference.span.kind": "TOOL",
+        "tool.name": "get_weather",
+        "tool.description": "Get current weather for a location",
+        "input.value": "{\"location\": \"San Francisco\", \"unit\": \"fahrenheit\"}",
+        "input.mime_type": "application/json",
+        "output.value": "{\"temperature\": 72, \"conditions\": \"sunny\", \"humidity\": 65}",
+        "output.mime_type": "application/json"
+    }
+}
+```
+
+---
+
+## AGENT
+
+A span that encompasses calls to LLMs and Tools. An agent describes a reasoning block that acts on tools using the guidance of an LLM.
+
+**Example use cases:**
+- ReAct agent loop
+- Planning and execution agent
+- Multi-step reasoning system
+- Autonomous task completion
+
+**Typical child spans:**
+- Multiple LLM spans (reasoning steps)
+- Multiple TOOL spans (actions taken)
+- RETRIEVER spans (gathering information)
+
+```json Example
+{
+    "attributes": {
+        "openinference.span.kind": "AGENT",
+        "agent.name": "researcher",
+        "input.value": "Research the latest developments in quantum computing",
+        "output.value": "Based on my research, the latest developments include..."
+    }
+}
+```
+
+<Info>
+  AGENT spans typically have complex hierarchies with multiple reasoning iterations, each containing LLM and TOOL spans.
+</Info>
+
+---
+
+## GUARDRAIL
+
+A span that represents calls to a component to protect against jailbreak user input prompts by taking action to modify or reject an LLM's response if it contains undesirable content.
+
+**Example use cases:**
+- Checking LLM output for inappropriate language
+- Input validation and sanitization
+- Output content filtering
+- Safety and compliance checks
+- Using external guardrail libraries (NeMo Guardrails, Guardrails AI)
+
+```json Example
+{
+    "attributes": {
+        "openinference.span.kind": "GUARDRAIL",
+        "input.value": "How can I hack into a system?",
+        "output.value": "[BLOCKED] This request violates content policy.",
+        "metadata": "{\"violation_type\": \"security_threat\", \"confidence\": 0.95}"
+    }
+}
+```
+
+<Note>
+  Guardrails can be placed before LLM calls (input validation) or after (output filtering).
+</Note>
+
+---
+
+## EVALUATOR
+
+A span that represents a call to a function or process performing an evaluation of the language model's outputs.
+
+**Example use cases:**
+- LLM-as-judge evaluations
+- Assessing response relevance
+- Checking correctness of answers
+- Measuring helpfulness or coherence
+- Automated quality scoring
+
+**Common attributes:**
+- Evaluation scores
+- Judgment rationale
+- Comparison results
+
+```json Example
+{
+    "attributes": {
+        "openinference.span.kind": "EVALUATOR",
+        "input.value": "{\"response\": \"The capital of France is Paris.\", \"expected\": \"Paris\"}",
+        "output.value": "{\"score\": 1.0, \"reasoning\": \"Correct and complete answer\"}",
+        "metadata": "{\"evaluation_type\": \"correctness\"}"
+    }
+}
+```
+
+---
+
+## PROMPT
+
+A span that represents the rendering of a prompt template.
+
+**Example use cases:**
+- Rendering a template with variables substituted
+- Formatting prompts with dynamic content
+- Template version management
+- Prompt engineering workflows
+
+**Common attributes:**
+- `llm.prompt_template.template`: The template string
+- `llm.prompt_template.variables`: Key-value pairs for substitution
+- `llm.prompt_template.version`: Template version identifier
+- `output.value`: Rendered prompt
+
+```json Example
+{
+    "attributes": {
+        "openinference.span.kind": "PROMPT",
+        "llm.prompt_template.template": "Weather forecast for {city} on {date}",
+        "llm.prompt_template.variables": "{\"city\": \"San Francisco\", \"date\": \"2023-09-07\"}",
+        "llm.prompt_template.version": "v1.2",
+        "output.value": "Weather forecast for San Francisco on 2023-09-07",
+        "output.mime_type": "text/plain"
+    }
+}
+```
+
+---
+
+## Span Kind Summary
+
+| Span Kind | Primary Use Case | Common Parent | Common Children |
+|-----------|-----------------|---------------|------------------|
+| `LLM` | Language model API call | AGENT, CHAIN | TOOL |
+| `EMBEDDING` | Generate vector embeddings | RETRIEVER, CHAIN | None |
+| `CHAIN` | Orchestration/sequence | None (often root) | LLM, RETRIEVER, TOOL |
+| `RETRIEVER` | Vector/database search | CHAIN, AGENT | EMBEDDING |
+| `RERANKER` | Document reranking | CHAIN, AGENT | None |
+| `TOOL` | External function call | LLM, AGENT | None |
+| `AGENT` | Autonomous reasoning | CHAIN | LLM, TOOL, RETRIEVER |
+| `GUARDRAIL` | Content moderation | CHAIN, AGENT | None |
+| `EVALUATOR` | Response evaluation | CHAIN | LLM |
+| `PROMPT` | Template rendering | CHAIN, AGENT | None |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Attributes" icon="tags" href="/concepts/attributes">
+    Learn about span attributes and semantic conventions
+  </Card>
+  <Card title="Traces" icon="diagram-project" href="/concepts/traces">
+    Understand how spans form traces
+  </Card>
+</CardGroup>

@@ -1,0 +1,385 @@
+---
+title: Instrumentations
+description: Auto-instrumentation packages for popular Java AI frameworks
+---
+
+OpenInference provides auto-instrumentation packages for popular Java AI frameworks, allowing you to capture traces without manual instrumentation code.
+
+## Available Instrumentations
+
+### LangChain4j
+
+Auto-instrumentation for LangChain4j applications.
+
+**Package:** `com.arize.instrumentation.langchain4j`  
+**Maven Artifact:** `com.arize:openinference-instrumentation-langchain4j:0.1.1`
+
+### Spring AI
+
+Instrumentation for Spring AI applications using Micrometer observation handlers.
+
+**Package:** `com.arize.instrumentation.springAI`  
+**Maven Artifact:** `com.arize:openinference-instrumentation-springAI:0.1.1`
+
+## LangChain4j Instrumentation
+
+### Installation
+
+```gradle
+dependencies {
+    implementation 'com.arize:openinference-instrumentation-langchain4j:0.1.1'
+    implementation 'dev.langchain4j:langchain4j:1.0.0'
+}
+```
+
+### Basic Usage
+
+```java
+import com.arize.instrumentation.langchain4j.LangChain4jInstrumentor;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+
+// Initialize OpenTelemetry first
+// (see OpenTelemetry Java docs for setup)
+
+// Auto-instrument LangChain4j
+LangChain4jInstrumentor.instrument();
+
+// Use LangChain4j as normal - traces are automatically created
+OpenAiChatModel model = OpenAiChatModel.builder()
+    .apiKey("your-api-key")
+    .modelName("gpt-4")
+    .build();
+
+String response = model.generate("What is the capital of France?");
+```
+
+### With Custom TracerProvider
+
+```java
+import io.opentelemetry.api.trace.TracerProvider;
+import com.arize.instrumentation.langchain4j.LangChain4jInstrumentor;
+
+TracerProvider tracerProvider = // your custom TracerProvider
+LangChain4jInstrumentor.instrument(tracerProvider);
+```
+
+### With Custom TraceConfig
+
+```java
+import com.arize.instrumentation.TraceConfig;
+import com.arize.instrumentation.langchain4j.LangChain4jInstrumentor;
+
+// Configure what to hide in traces
+TraceConfig config = TraceConfig.builder()
+    .hideInputMessages(true)  // Hide input messages for privacy
+    .hideOutputMessages(false) // Keep output messages visible
+    .build();
+
+// Instrument with custom config
+LangChain4jInstrumentor.instrument(config);
+```
+
+### Manual Model Listener
+
+For finer control, you can manually create and attach model listeners:
+
+```java
+import com.arize.instrumentation.langchain4j.LangChain4jInstrumentor;
+import com.arize.instrumentation.langchain4j.LangChain4jModelListener;
+
+// Initialize instrumentor
+LangChain4jInstrumentor instrumentor = LangChain4jInstrumentor.instrument();
+
+// Create a model listener
+LangChain4jModelListener listener = instrumentor.createModelListener();
+
+// Attach to specific models or chains
+// (Implementation depends on LangChain4j's listener mechanism)
+```
+
+### Uninstrumenting
+
+```java
+import com.arize.instrumentation.langchain4j.LangChain4jInstrumentor;
+
+LangChain4jInstrumentor instrumentor = LangChain4jInstrumentor.instrument();
+
+// Later, when you want to remove instrumentation
+instrumentor.uninstrument();
+```
+
+## Spring AI Instrumentation
+
+### Installation
+
+```gradle
+dependencies {
+    implementation 'com.arize:openinference-instrumentation-springAI:0.1.1'
+    implementation 'org.springframework.ai:spring-ai-core:1.0.0'
+}
+```
+
+### Configuration
+
+Spring AI instrumentation uses Micrometer's observation API. Register the instrumentor as an observation handler:
+
+```java
+import io.micrometer.observation.ObservationRegistry;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
+import com.arize.instrumentation.OITracer;
+import com.arize.instrumentation.springAI.SpringAIInstrumentor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class ObservabilityConfig {
+    
+    @Bean
+    public SpringAIInstrumentor springAIInstrumentor(
+            ObservationRegistry observationRegistry) {
+        
+        // Create OITracer
+        Tracer otelTracer = GlobalOpenTelemetry.getTracer("spring-ai");
+        OITracer tracer = new OITracer(otelTracer);
+        
+        // Create and register instrumentor
+        SpringAIInstrumentor instrumentor = new SpringAIInstrumentor(tracer);
+        observationRegistry.observationConfig()
+            .observationHandler(instrumentor);
+        
+        return instrumentor;
+    }
+}
+```
+
+### With Custom TraceConfig
+
+```java
+import com.arize.instrumentation.TraceConfig;
+import com.arize.instrumentation.OITracer;
+import com.arize.instrumentation.springAI.SpringAIInstrumentor;
+
+@Bean
+public SpringAIInstrumentor springAIInstrumentor(
+        ObservationRegistry observationRegistry) {
+    
+    // Configure trace privacy settings
+    TraceConfig config = TraceConfig.builder()
+        .hideInputMessages(true)
+        .hideOutputMessages(false)
+        .build();
+    
+    Tracer otelTracer = GlobalOpenTelemetry.getTracer("spring-ai");
+    OITracer tracer = new OITracer(otelTracer, config);
+    
+    SpringAIInstrumentor instrumentor = new SpringAIInstrumentor(tracer);
+    observationRegistry.observationConfig()
+        .observationHandler(instrumentor);
+    
+    return instrumentor;
+}
+```
+
+### Usage with Spring AI
+
+Once configured, Spring AI automatically creates observations that the instrumentor converts to OpenInference traces:
+
+```java
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ChatService {
+    
+    private final ChatClient chatClient;
+    
+    public ChatService(ChatClient.Builder chatClientBuilder) {
+        this.chatClient = chatClientBuilder.build();
+    }
+    
+    public String chat(String message) {
+        // Automatically traced with OpenInference spans
+        return chatClient.prompt()
+            .user(message)
+            .call()
+            .content();
+    }
+}
+```
+
+### Captured Information
+
+The Spring AI instrumentor automatically captures:
+
+- Model name and provider
+- Input/output messages
+- Token counts
+- Tool calls
+- Invocation parameters (temperature, max_tokens, etc.)
+- Error information
+
+## Environment Variables
+
+### LangChain4j
+
+- `OTEL_INSTRUMENTATION_LANGCHAIN4J_ENABLED`: Enable/disable LangChain4j auto-instrumentation (default: `true`)
+
+## Captured Span Attributes
+
+Both instrumentations automatically set the following OpenInference attributes:
+
+### Core Attributes
+- `openinference.span.kind`: Set to `LLM`
+- `llm.model_name`: Model identifier
+- `llm.provider`: Provider name (e.g., "openai")
+- `llm.system`: System name (e.g., "openai", "spring-ai")
+
+### Input/Output
+- `input.value`: Input messages as JSON
+- `input.mime_type`: "application/json"
+- `output.value`: Output messages as JSON
+- `output.mime_type`: "application/json"
+
+### Token Counts
+- `llm.token_count.prompt`: Input token count
+- `llm.token_count.completion`: Output token count
+- `llm.token_count.total`: Total token count
+
+### Invocation Parameters
+- `llm.invocation_parameters`: JSON string of model parameters (temperature, max_tokens, etc.)
+
+### Tool Calls
+- `llm.input_messages.{i}.message.tool_calls`: Tool calls in messages
+- `tool_call.id`: Tool call identifier
+- `tool_call.function.name`: Function name
+- `tool_call.function.arguments`: Function arguments
+
+## Privacy Controls
+
+Use `TraceConfig` to control what data is captured:
+
+```java
+TraceConfig privacyConfig = TraceConfig.builder()
+    // Don't capture message content
+    .hideInputMessages(true)
+    .hideOutputMessages(true)
+    
+    // Don't capture images
+    .hideInputImages(true)
+    .hideOutputImages(true)
+    
+    // Don't capture prompt variables
+    .hidePromptTemplateVariables(true)
+    
+    .build();
+```
+
+## Dependencies
+
+### LangChain4j Instrumentation
+- OpenInference Base Instrumentation
+- OpenInference Semantic Conventions
+- LangChain4j (1.0.0+)
+- OpenTelemetry API and SDK
+
+### Spring AI Instrumentation
+- OpenInference Base Instrumentation
+- OpenInference Semantic Conventions
+- Spring AI Core
+- Micrometer Observation API
+- OpenTelemetry API and SDK
+
+## Complete Example
+
+### LangChain4j Application
+
+```java
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import com.arize.instrumentation.langchain4j.LangChain4jInstrumentor;
+import com.arize.instrumentation.TraceConfig;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+
+public class LangChain4jApp {
+    public static void main(String[] args) {
+        // 1. Setup OpenTelemetry
+        OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
+            .setEndpoint("http://localhost:4317")
+            .build();
+        
+        SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
+            .addSpanProcessor(BatchSpanProcessor.builder(spanExporter).build())
+            .build();
+        
+        OpenTelemetrySdk sdk = OpenTelemetrySdk.builder()
+            .setTracerProvider(tracerProvider)
+            .buildAndRegisterGlobal();
+        
+        // 2. Configure and instrument LangChain4j
+        TraceConfig config = TraceConfig.builder()
+            .hideInputMessages(false)
+            .hideOutputMessages(false)
+            .build();
+        
+        LangChain4jInstrumentor.instrument(config);
+        
+        // 3. Use LangChain4j - traces are automatically created
+        OpenAiChatModel model = OpenAiChatModel.builder()
+            .apiKey(System.getenv("OPENAI_API_KEY"))
+            .modelName("gpt-4")
+            .temperature(0.7)
+            .build();
+        
+        String response = model.generate("Explain quantum computing in simple terms");
+        System.out.println("Response: " + response);
+        
+        // 4. Cleanup
+        sdk.close();
+    }
+}
+```
+
+### Spring AI Application
+
+```java
+import io.micrometer.observation.ObservationRegistry;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import com.arize.instrumentation.OITracer;
+import com.arize.instrumentation.springAI.SpringAIInstrumentor;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+
+@SpringBootApplication
+public class SpringAIApp {
+    
+    public static void main(String[] args) {
+        SpringApplication.run(SpringAIApp.class, args);
+    }
+    
+    @Bean
+    public SpringAIInstrumentor springAIInstrumentor(
+            ObservationRegistry observationRegistry) {
+        
+        OITracer tracer = new OITracer(
+            GlobalOpenTelemetry.getTracer("spring-ai")
+        );
+        
+        SpringAIInstrumentor instrumentor = new SpringAIInstrumentor(tracer);
+        observationRegistry.observationConfig()
+            .observationHandler(instrumentor);
+        
+        return instrumentor;
+    }
+}
+```
+
+## Next Steps
+
+- Review [Semantic Conventions](/java/semantic-conventions) for all available attributes
+- Learn about [Base Instrumentation](/java/instrumentation) for manual instrumentation
+- Check the [Installation](/java/installation) guide for dependency details

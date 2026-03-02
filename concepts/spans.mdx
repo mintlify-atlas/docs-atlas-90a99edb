@@ -1,0 +1,315 @@
+---
+title: Spans
+description: Span anatomy, timestamps, status, and attributes
+---
+
+A span represents a **unit of work or operation**. Spans are the building blocks of traces. In OpenInference, they capture everything from LLM calls to tool invocations to retrieval operations.
+
+## Span Anatomy
+
+Every OpenInference span includes the following information:
+
+| Field | Description | Required |
+|-------|-------------|----------|
+| Name | Human-readable operation name | Yes |
+| Parent span ID | Reference to parent span (empty for root spans) | No |
+| Start timestamp | When the operation began | Yes |
+| End timestamp | When the operation completed | Yes |
+| Span context | Contains trace ID and span ID | Yes |
+| Attributes | Key-value pairs with operation metadata | Yes |
+| Span events | Structured log messages during the span | No |
+| Span status | OK, ERROR, or UNSET | Yes |
+| Span kind | OpenTelemetry span kind (usually INTERNAL) | Yes |
+
+## Example Span
+
+Here's a complete span representing an LLM call:
+
+```json
+{
+    "name": "query",
+    "context": {
+        "trace_id": "ed7b336d-e71a-46f0-a334-5f2e87cb6cfc",
+        "span_id": "f89ebb7c-10f6-4bf8-8a74-57324d2556ef"
+    },
+    "span_kind": "SPAN_KIND_INTERNAL",
+    "parent_id": null,
+    "start_time": "2023-09-07T12:54:47.293922-06:00",
+    "end_time": "2023-09-07T12:54:49.322066-06:00",
+    "status_code": "OK",
+    "status_message": "",
+    "attributes": {
+        "openinference.span.kind": "CHAIN",
+        "input.value": "Hello?",
+        "input.mime_type": "text/plain",
+        "output.value": "I am here.",
+        "output.mime_type": "text/plain"
+    },
+    "events": []
+}
+```
+
+## Timestamps
+
+Spans record precise timing information with **nanosecond precision**:
+
+<CodeGroup>
+```json Example
+{
+    "start_time": "2023-09-07T12:54:47.293922-06:00",
+    "end_time": "2023-09-07T12:54:49.322066-06:00"
+}
+```
+</CodeGroup>
+
+**Duration calculation:**
+```
+Duration = end_time - start_time
+         = 2.028144 seconds
+```
+
+<Note>
+  Timestamps are recorded in ISO 8601 format with timezone information.
+</Note>
+
+## Span Context
+
+Span context is an **immutable object** that uniquely identifies a span within a trace:
+
+```json
+{
+    "context": {
+        "trace_id": "ed7b336d-e71a-46f0-a334-5f2e87cb6cfc",
+        "span_id": "f89ebb7c-10f6-4bf8-8a74-57324d2556ef"
+    }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `trace_id` | Unique identifier for the entire trace |
+| `span_id` | Unique identifier for this specific span |
+
+<Info>
+  Span context is used for context propagation—ensuring child spans are connected to their parents.
+</Info>
+
+## Attributes
+
+Attributes are **key-value pairs** that contain metadata about the operation:
+
+```json
+{
+    "attributes": {
+        "openinference.span.kind": "LLM",
+        "llm.system": "openai",
+        "llm.model_name": "gpt-4-0613",
+        "llm.token_count.prompt": 229,
+        "llm.token_count.completion": 21,
+        "llm.token_count.total": 250
+    }
+}
+```
+
+### Attribute Rules
+
+<AccordionGroup>
+  <Accordion title="Key requirements">
+    - Keys MUST be non-null string values
+    - Keys SHOULD follow dot-separated namespace conventions
+    - Keys MUST be unique within a span
+  </Accordion>
+
+  <Accordion title="Value types">
+    Values MUST be one of:
+    - Non-null string
+    - Boolean
+    - Floating point value
+    - Integer
+    - Array of any of the above types
+  </Accordion>
+
+  <Accordion title="Semantic conventions">
+    OpenInference defines **semantic attributes**—standardized naming conventions for common metadata. Always use semantic attribute names when available.
+  </Accordion>
+</AccordionGroup>
+
+<Card title="Attribute conventions" icon="tags" href="/concepts/attributes">
+  Learn about semantic conventions and naming patterns
+</Card>
+
+## Span Events
+
+A span event is a **structured log message** (or annotation) on a span, typically used to denote a meaningful, singular point in time during the span's duration.
+
+### When to Use Span Events
+
+Consider two scenarios with an LLM:
+
+<CardGroup cols={2}>
+  <Card title="Use a Span" icon="cube">
+    **Tracking LLM execution time**
+    
+    A span is best because it's an operation with a start and an end.
+  </Card>
+  
+  <Card title="Use a Span Event" icon="circle-dot">
+    **Denoting when first token is sent**
+    
+    An event is best because it represents a meaningful, singular point in time.
+  </Card>
+</CardGroup>
+
+### Event Structure
+
+```json
+{
+    "events": [
+        {
+            "name": "first_token",
+            "timestamp": "2023-09-07T12:54:48.123456-06:00",
+            "attributes": {
+                "token": "Hello"
+            }
+        }
+    ]
+}
+```
+
+## Span Status
+
+A status is attached to every span to indicate whether the operation succeeded or failed:
+
+| Status | Description | When to Use |
+|--------|-------------|-------------|
+| `UNSET` | Default status | When no error occurred and no explicit success was set |
+| `OK` | Successful operation | When the operation completed successfully |
+| `ERROR` | Failed operation | When an exception or error occurred |
+
+<Note>
+  When an exception is handled, a span status SHOULD be set to ERROR and include a status message.
+</Note>
+
+### Example: Error Status
+
+```json
+{
+    "status_code": "ERROR",
+    "status_message": "OpenAI API rate limit exceeded",
+    "attributes": {
+        "exception.type": "RateLimitError",
+        "exception.message": "Rate limit exceeded for gpt-4",
+        "exception.stacktrace": "..."
+    }
+}
+```
+
+## Nested Spans
+
+Spans can be **nested** to represent sub-operations:
+
+```
+query (parent_id: null)
+└── llm (parent_id: query.span_id)
+    ├── tool_1 (parent_id: llm.span_id)
+    └── tool_2 (parent_id: llm.span_id)
+```
+
+The `parent_id` field establishes the hierarchy. Child spans represent work done as part of the parent operation.
+
+<Info>
+  The presence of a parent span ID implies that child spans represent sub-operations. This allows spans to accurately capture the work done in an application.
+</Info>
+
+## OpenInference Span Kind
+
+The `openinference.span.kind` attribute is **REQUIRED** for all OpenInference spans and identifies the type of operation:
+
+```json
+{
+    "attributes": {
+        "openinference.span.kind": "LLM"
+    }
+}
+```
+
+Valid values:
+- `LLM` - Language model call
+- `CHAIN` - Orchestration or sequence
+- `AGENT` - Autonomous agent reasoning
+- `TOOL` - External function or API call
+- `RETRIEVER` - Data retrieval operation
+- `RERANKER` - Document reranking
+- `EMBEDDING` - Embedding generation
+- `GUARDRAIL` - Content moderation
+- `EVALUATOR` - Response evaluation
+- `PROMPT` - Prompt template rendering
+
+<Card title="Span Kinds" icon="list" href="/concepts/span-kinds">
+  Learn about all available span kinds
+</Card>
+
+<Note>
+  **Important:** `span_kind` is an OpenTelemetry concept (usually set to `SPAN_KIND_INTERNAL`), while `openinference.span.kind` is an OpenInference-specific attribute that provides AI-aware classification.
+</Note>
+
+## Common Span Patterns
+
+### Root Span
+
+```json
+{
+    "name": "query",
+    "parent_id": null,  // No parent = root span
+    "attributes": {
+        "openinference.span.kind": "CHAIN"
+    }
+}
+```
+
+### LLM Span
+
+```json
+{
+    "name": "ChatCompletion",
+    "parent_id": "<parent-span-id>",
+    "attributes": {
+        "openinference.span.kind": "LLM",
+        "llm.system": "openai",
+        "llm.model_name": "gpt-4",
+        "llm.input_messages": [...],
+        "llm.output_messages": [...],
+        "llm.token_count.total": 250
+    }
+}
+```
+
+### Tool Span
+
+```json
+{
+    "name": "weather_api",
+    "parent_id": "<parent-span-id>",
+    "attributes": {
+        "openinference.span.kind": "TOOL",
+        "tool.name": "get_weather",
+        "tool.description": "Get current weather for a location",
+        "input.value": "{\"location\": \"San Francisco\"}",
+        "output.value": "{\"temperature\": 72, \"conditions\": \"sunny\"}"
+    }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Span Kinds" icon="list" href="/concepts/span-kinds">
+    Explore all OpenInference span kinds
+  </Card>
+  <Card title="Attributes" icon="tags" href="/concepts/attributes">
+    Learn attribute naming conventions
+  </Card>
+  <Card title="Traces" icon="diagram-project" href="/concepts/traces">
+    Understand how spans form traces
+  </Card>
+</CardGroup>

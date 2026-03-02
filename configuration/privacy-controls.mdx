@@ -1,0 +1,412 @@
+---
+title: Privacy Controls
+description: Implement data filtering, PII masking, and selective tracing suppression in OpenInference
+---
+
+# Privacy Controls
+
+OpenInference provides comprehensive privacy controls to help you maintain security and compliance while still benefiting from observability. You can mask PII, filter sensitive data, and selectively suppress tracing.
+
+## Overview
+
+Privacy controls in OpenInference allow you to:
+- **Mask sensitive data** - Replace PII with `"__REDACTED__"` placeholder
+- **Filter specific content** - Hide images, text, or embeddings selectively
+- **Suppress tracing** - Completely disable tracing for specific code blocks
+- **Control payload size** - Limit large data like base64-encoded images
+
+## Redacted Value Placeholder
+
+When content is hidden, OpenInference uses the constant `"__REDACTED__"` as a placeholder. This allows trace consumers to identify that content was intentionally hidden rather than missing or empty.
+
+The redacted value constant is available for import:
+
+<CodeGroup>
+```python Python
+from openinference.instrumentation import REDACTED_VALUE
+print(REDACTED_VALUE)  # "__REDACTED__"
+```
+
+```typescript JavaScript
+import { REDACTED_VALUE } from "@arizeai/openinference-core";
+console.log(REDACTED_VALUE); // "__REDACTED__"
+```
+</CodeGroup>
+
+## PII Masking
+
+### Hiding Text Content
+
+Protect user messages and LLM responses while preserving trace structure:
+
+<CodeGroup>
+```python Python
+from openinference.instrumentation import TraceConfig
+
+config = TraceConfig(
+    hide_input_text=True,
+    hide_output_text=True,
+)
+```
+
+```typescript JavaScript
+const traceConfig = {
+  hideInputText: true,
+  hideOutputText: true,
+};
+```
+
+```bash Environment Variables
+export OPENINFERENCE_HIDE_INPUT_TEXT=true
+export OPENINFERENCE_HIDE_OUTPUT_TEXT=true
+```
+</CodeGroup>
+
+This configuration:
+- Replaces message text with `"__REDACTED__"`
+- Preserves message structure and metadata
+- Maintains trace flow and timing information
+
+### Hiding Complete Messages
+
+Remove entire message objects from traces:
+
+<CodeGroup>
+```python Python
+config = TraceConfig(
+    hide_input_messages=True,
+    hide_output_messages=True,
+)
+```
+
+```typescript JavaScript
+const traceConfig = {
+  hideInputMessages: true,
+  hideOutputMessages: true,
+};
+```
+
+```bash Environment Variables
+export OPENINFERENCE_HIDE_INPUT_MESSAGES=true
+export OPENINFERENCE_HIDE_OUTPUT_MESSAGES=true
+```
+</CodeGroup>
+
+### Hiding All Inputs/Outputs
+
+Hide both values and messages completely:
+
+<CodeGroup>
+```python Python
+config = TraceConfig(
+    hide_inputs=True,
+    hide_outputs=True,
+)
+```
+
+```typescript JavaScript
+const traceConfig = {
+  hideInputs: true,
+  hideOutputs: true,
+};
+```
+
+```bash Environment Variables
+export OPENINFERENCE_HIDE_INPUTS=true
+export OPENINFERENCE_HIDE_OUTPUTS=true
+```
+</CodeGroup>
+
+**Note:** Setting `hide_inputs=True` automatically hides input messages. Setting `hide_input_messages=True` hides only messages but not the input value.
+
+## Data Filtering
+
+### Hiding Images
+
+Remove images from traces while keeping text:
+
+<CodeGroup>
+```python Python
+config = TraceConfig(
+    hide_input_images=True,
+)
+```
+
+```typescript JavaScript
+const traceConfig = {
+  hideInputImages: true,
+};
+```
+
+```bash Environment Variables
+export OPENINFERENCE_HIDE_INPUT_IMAGES=true
+```
+</CodeGroup>
+
+This is useful when:
+- Images may contain sensitive or identifying information
+- You want to reduce storage costs
+- Compliance requires removing visual data
+
+### Limiting Image Size
+
+Truncate large base64-encoded images:
+
+<CodeGroup>
+```python Python
+config = TraceConfig(
+    base64_image_max_length=8000,  # Limit to 8KB
+)
+```
+
+```typescript JavaScript
+const traceConfig = {
+  base64ImageMaxLength: 8000,  // Limit to 8KB
+};
+```
+
+```bash Environment Variables
+export OPENINFERENCE_BASE64_IMAGE_MAX_LENGTH=8000
+```
+</CodeGroup>
+
+Images exceeding this length are replaced with `"__REDACTED__"`.
+
+### Hiding Embeddings
+
+Protect embedding vectors and their associated text:
+
+<CodeGroup>
+```python Python
+config = TraceConfig(
+    hide_embeddings_vectors=True,
+    hide_embeddings_text=True,
+)
+```
+
+```typescript JavaScript
+const traceConfig = {
+  hideEmbeddingVectors: true,
+};
+```
+
+```bash Environment Variables
+export OPENINFERENCE_HIDE_EMBEDDINGS_VECTORS=true
+export OPENINFERENCE_HIDE_EMBEDDINGS_TEXT=true
+```
+</CodeGroup>
+
+## Suppressing Tracing
+
+### Context Manager (Python)
+
+Completely disable tracing for specific code blocks:
+
+```python
+from openinference.instrumentation import suppress_tracing
+
+# Normal tracing occurs here
+response = client.chat.completions.create(
+    model="gpt-4",
+    messages=[{"role": "user", "content": "Hello"}]
+)
+
+# No tracing occurs within this block
+with suppress_tracing():
+    sensitive_response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": "SSN: 123-45-6789"}]
+    )
+
+# Normal tracing resumes here
+```
+
+### Async Support (Python)
+
+```python
+from openinference.instrumentation import suppress_tracing
+
+async def process_sensitive_data():
+    async with suppress_tracing():
+        # No tracing occurs in this async block
+        result = await async_llm_call()
+    return result
+```
+
+### JavaScript Suppression
+
+Use OpenTelemetry's built-in suppression:
+
+```typescript
+import { suppressTracing } from "@opentelemetry/core";
+import { context } from "@opentelemetry/api";
+
+// Normal tracing
+const response1 = await openai.chat.completions.create({
+  model: "gpt-4",
+  messages: [{ role: "user", content: "Hello" }],
+});
+
+// Suppress tracing for this call
+await context.with(suppressTracing(context.active()), async () => {
+  const sensitiveResponse = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [{ role: "user", content: "SSN: 123-45-6789" }],
+  });
+});
+```
+
+## Common Privacy Scenarios
+
+### GDPR Compliance
+
+Minimize personal data collection:
+
+```python
+config = TraceConfig(
+    hide_input_text=True,
+    hide_output_text=True,
+    hide_embeddings_text=True,
+    hide_input_images=True,
+)
+```
+
+### HIPAA Compliance
+
+Protect healthcare information:
+
+```python
+config = TraceConfig(
+    hide_inputs=True,
+    hide_outputs=True,
+    hide_embeddings_vectors=True,
+    hide_embeddings_text=True,
+)
+```
+
+### Financial Services
+
+Hide transaction details and account numbers:
+
+```python
+config = TraceConfig(
+    hide_input_text=True,
+    hide_output_text=True,
+    hide_llm_invocation_parameters=True,
+)
+```
+
+### Development vs. Production
+
+Use environment-specific configurations:
+
+```python
+import os
+from openinference.instrumentation import TraceConfig
+
+if os.getenv("ENVIRONMENT") == "production":
+    config = TraceConfig(
+        hide_input_text=True,
+        hide_output_text=True,
+    )
+else:
+    # Development: full observability
+    config = TraceConfig()
+```
+
+### Cost Optimization
+
+Reduce storage costs while maintaining observability:
+
+```python
+config = TraceConfig(
+    hide_input_images=True,
+    base64_image_max_length=4000,
+    hide_embeddings_vectors=True,
+)
+```
+
+## Advanced Patterns
+
+### Selective Message Filtering
+
+Hide text but keep images for debugging:
+
+```python
+config = TraceConfig(
+    hide_input_text=True,
+    hide_output_text=True,
+    hide_input_images=False,  # Keep images
+)
+```
+
+### Embedding Privacy
+
+Hide vectors but keep text for searchability:
+
+```python
+config = TraceConfig(
+    hide_embeddings_vectors=True,
+    hide_embeddings_text=False,
+)
+```
+
+### LLM-Specific Controls
+
+Hide only invocation parameters:
+
+```python
+config = TraceConfig(
+    hide_llm_invocation_parameters=True,  # Hide model config
+    hide_inputs=False,  # Show inputs
+    hide_outputs=False,  # Show outputs
+)
+```
+
+### Completions API Privacy
+
+For legacy completions API:
+
+```python
+config = TraceConfig(
+    hide_prompts=True,  # Hide prompt strings
+    hide_choices=True,  # Hide completion choices
+)
+```
+
+## Best Practices
+
+1. **Start restrictive** - Begin with more privacy controls and relax as needed
+2. **Test in development** - Verify traces contain expected information before deploying
+3. **Document your choices** - Keep a record of which privacy controls are enabled and why
+4. **Use environment variables** - Make privacy settings configurable per environment
+5. **Review regularly** - Audit your privacy settings as requirements change
+6. **Combine methods** - Use both TraceConfig and suppress_tracing for comprehensive control
+7. **Monitor impact** - Ensure privacy controls don't hide critical debugging information
+
+## Validation
+
+Verify your privacy controls are working:
+
+```python
+from openinference.instrumentation import TraceConfig, REDACTED_VALUE
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter
+
+# Set up tracing with privacy controls
+tracer_provider = TracerProvider()
+tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+
+config = TraceConfig(hide_input_text=True)
+
+# Instrument and test
+from openinference.instrumentation.openai import OpenAIInstrumentor
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider, config=config)
+
+# Make a call and check console output for REDACTED_VALUE
+```
+
+## Next Steps
+
+- See [TraceConfig](/configuration/trace-config) for complete configuration reference
+- See [Environment Variables](/configuration/environment-variables) for deployment options

@@ -1,0 +1,209 @@
+---
+title: Traces
+description: Trace structure, tree hierarchy, and context propagation
+---
+
+Traces give us the big picture of what happens when a request is made to an LLM application. Whether your application is an agent or a chatbot, traces are essential to understanding the full "path" a request takes in your application.
+
+## What is a Trace?
+
+A **trace** records the full execution path of a request—from the user's initial input through every LLM call, tool invocation, and retrieval step to the final response. Traces are trees of spans connected by parent–child relationships.
+
+<Info>
+  All spans in a trace share the same `trace_id`, which uniquely identifies the trace.
+</Info>
+
+## Trace Structure
+
+Let's explore a simple trace with two units of work, represented as spans:
+
+### Root Span (Query)
+
+```json
+{
+    "name": "query",
+    "context": {
+        "trace_id": "ed7b336d-e71a-46f0-a334-5f2e87cb6cfc",
+        "span_id": "f89ebb7c-10f6-4bf8-8a74-57324d2556ef"
+    },
+    "span_kind": "SPAN_KIND_INTERNAL",
+    "parent_id": null,
+    "start_time": "2023-09-07T12:54:47.293922-06:00",
+    "end_time": "2023-09-07T12:54:49.322066-06:00",
+    "status_code": "OK",
+    "status_message": "",
+    "attributes": {
+        "openinference.span.kind": "CHAIN",
+        "input.value": "Is anybody there?",
+        "input.mime_type": "text/plain",
+        "output.value": "Yes, I am here.",
+        "output.mime_type": "text/plain"
+    },
+    "events": []
+}
+```
+
+This is the **root span**, denoting the beginning and end of the entire operation. Note that:
+- It has a `trace_id` field indicating the trace
+- It has **no `parent_id`**—this is how you identify a root span
+- It represents the top-level operation (a query to the LLM application)
+
+### Child Span (LLM Call)
+
+```json
+{
+    "name": "llm",
+    "context": {
+        "trace_id": "ed7b336d-e71a-46f0-a334-5f2e87cb6cfc",
+        "span_id": "ad67332a-38bd-428e-9f62-538ba2fa90d4"
+    },
+    "span_kind": "SPAN_KIND_INTERNAL",
+    "parent_id": "f89ebb7c-10f6-4bf8-8a74-57324d2556ef",
+    "start_time": "2023-09-07T12:54:47.597121-06:00",
+    "end_time": "2023-09-07T12:54:49.321811-06:00",
+    "status_code": "OK",
+    "status_message": "",
+    "attributes": {
+        "openinference.span.kind": "LLM",
+        "llm.input_messages": [
+            {
+                "message.role": "system",
+                "message.content": "You are an expert Q&A system..."
+            },
+            {
+                "message.role": "user",
+                "message.content": "Hello?"
+            }
+        ],
+        "output.value": "assistant: Yes I am here",
+        "output.mime_type": "text/plain"
+    },
+    "events": []
+}
+```
+
+This span encapsulates a sub-task (invoking an LLM), and its parent is the query span. Note that:
+- It shares the **same `trace_id`** as the root span
+- It has a `parent_id` that **matches the `span_id` of the query span**
+- This parent-child relationship creates the trace hierarchy
+
+<Note>
+  These blocks of JSON all share the same `trace_id`, and the `parent_id` field represents a hierarchy. That makes it a trace!
+</Note>
+
+## Trace Hierarchy
+
+Traces form **tree structures** where:
+- The root span has no parent (`parent_id` is `null`)
+- Child spans reference their parent's `span_id` via `parent_id`
+- Multiple spans can share the same parent (siblings)
+- Spans can be nested to arbitrary depth
+
+```
+query (CHAIN)
+├── llm (LLM)
+├── retriever (RETRIEVER)
+│   └── embedding (EMBEDDING)
+└── llm (LLM)
+    └── tool (TOOL)
+```
+
+## Context Propagation
+
+Context propagation ensures that all operations in a distributed system are connected to the same trace. When a span creates child operations:
+
+1. The current `trace_id` is propagated to all child spans
+2. The parent's `span_id` becomes the child's `parent_id`
+3. Context attributes (session ID, user ID, metadata) are automatically inherited
+
+<Info>
+  Context propagation happens automatically when using OpenInference instrumentation libraries.
+</Info>
+
+## Span Context
+
+Span context is an **immutable object** on every span that contains:
+
+| Field | Description |
+|-------|-------------|
+| `trace_id` | The trace ID representing the trace that the span is a part of |
+| `span_id` | The span's unique identifier within the trace |
+
+Because span context contains the trace ID, it is used when creating span links and propagating context across service boundaries.
+
+## Traces as Structured Logs
+
+One way to think of traces is that they're a **collection of structured logs with context, correlation, hierarchy, and more baked in**. However, these "structured logs" can come from different parts of your application stack:
+
+- Vector store retrieval
+- LangChain tools
+- Multiple LLM calls
+- Embedding generation
+- Guardrail checks
+
+This is what allows tracing to represent an **end-to-end view** of any system.
+
+## Tracing Components
+
+### Tracer
+
+A **Tracer** creates spans containing information about what is happening for a given operation, such as a request to an LLM or a tool invocation.
+
+### Trace Exporters
+
+Trace exporters send traces to a consumer. This consumer can be:
+- Standard output for debugging and development
+- An OpenInference collector
+- An observability backend (Phoenix, Arize, etc.)
+
+## Example: Multi-Step Trace
+
+Here's a typical trace for a RAG (Retrieval-Augmented Generation) application:
+
+```
+1. query (CHAIN) - Root span
+   ├─ 2. retriever (RETRIEVER) - Search for relevant documents
+   │  └─ 3. embedding (EMBEDDING) - Generate query embedding
+   ├─ 4. reranker (RERANKER) - Rerank retrieved documents
+   └─ 5. llm (LLM) - Generate response with context
+```
+
+**Timeline view:**
+```
+[query                                          ]
+  [retriever              ]
+    [embedding  ]
+                  [reranker    ]
+                              [llm              ]
+```
+
+<Note>
+  Spans can overlap in time when operations happen in parallel, but the parent-child relationships always form a tree structure.
+</Note>
+
+## Context Attributes
+
+Context attributes are automatically propagated to all spans in a trace:
+
+| Attribute | Description |
+|-----------|-------------|
+| `session.id` | Unique identifier for the session |
+| `user.id` | Unique identifier for the user |
+| `metadata` | JSON string of key-value metadata |
+| `tag.tags` | List of string tags for categorization |
+
+These attributes help correlate traces across multiple requests and user sessions.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Spans" icon="cube" href="/concepts/spans">
+    Learn about the building blocks of traces
+  </Card>
+  <Card title="Span Kinds" icon="list" href="/concepts/span-kinds">
+    Explore different types of spans
+  </Card>
+  <Card title="Attributes" icon="tags" href="/concepts/attributes">
+    Understand attribute conventions
+  </Card>
+</CardGroup>

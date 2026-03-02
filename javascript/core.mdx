@@ -1,0 +1,536 @@
+---
+title: "Core Package"
+description: "OpenInference Core utilities for JavaScript tracing"
+---
+
+## Overview
+
+The `@arizeai/openinference-core` package provides the foundational utilities for OpenInference JavaScript tracing:
+
+- **OITracer**: OpenTelemetry tracer wrapper with data masking
+- **Context Attributes**: Session ID, user ID, metadata, and tags propagation
+- **Span Wrappers**: `withSpan`, `traceChain`, `traceAgent`, `traceTool`
+- **Decorators**: `@observe` for class methods
+- **Attribute Helpers**: Functions to generate OpenInference-compliant attributes
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm install --save @arizeai/openinference-core
+```
+
+```bash yarn
+yarn add @arizeai/openinference-core
+```
+
+```bash pnpm
+pnpm add @arizeai/openinference-core
+```
+</CodeGroup>
+
+## OITracer
+
+`OITracer` wraps an OpenTelemetry tracer and can redact sensitive data before writing spans.
+
+### Basic Usage
+
+```typescript
+import { trace } from "@opentelemetry/api";
+import { OITracer } from "@arizeai/openinference-core";
+
+const tracer = new OITracer({
+  tracer: trace.getTracer("my-service"),
+  traceConfig: {
+    hideInputs: true,
+    hideOutputText: true,
+    hideEmbeddingVectors: true,
+    base64ImageMaxLength: 8000,
+  },
+});
+```
+
+### TraceConfig Options
+
+```typescript
+interface TraceConfigOptions {
+  hideInputs?: boolean;              // Hide all inputs
+  hideOutputs?: boolean;             // Hide all outputs
+  hideInputMessages?: boolean;       // Hide LLM input messages
+  hideOutputMessages?: boolean;      // Hide LLM output messages
+  hideInputText?: boolean;           // Hide input text content
+  hideOutputText?: boolean;          // Hide output text content
+  hideInputImages?: boolean;         // Hide input images
+  hideEmbeddingVectors?: boolean;    // Hide embedding vectors
+  hidePrompts?: boolean;             // Hide prompt templates
+  base64ImageMaxLength?: number;     // Max base64 image length (default: 32000)
+}
+```
+
+### Environment Variables
+
+Configure masking via environment variables:
+
+```bash
+OPENINFERENCE_HIDE_INPUTS=true
+OPENINFERENCE_HIDE_OUTPUTS=true
+OPENINFERENCE_HIDE_INPUT_MESSAGES=true
+OPENINFERENCE_HIDE_OUTPUT_MESSAGES=true
+OPENINFERENCE_HIDE_INPUT_IMAGES=true
+OPENINFERENCE_HIDE_INPUT_TEXT=true
+OPENINFERENCE_HIDE_OUTPUT_TEXT=true
+OPENINFERENCE_HIDE_EMBEDDING_VECTORS=true
+OPENINFERENCE_BASE64_IMAGE_MAX_LENGTH=8000
+OPENINFERENCE_HIDE_PROMPTS=true
+```
+
+## Context Attributes
+
+Propagate request-level attributes across all spans in a context.
+
+### Available Setters
+
+```typescript
+import { context } from "@opentelemetry/api";
+import {
+  setSession,
+  setUser,
+  setMetadata,
+  setTags,
+  setPromptTemplate,
+  setAttributes,
+} from "@arizeai/openinference-core";
+
+const enrichedContext = setAttributes(
+  setPromptTemplate(
+    setTags(
+      setMetadata(
+        setUser(
+          setSession(context.active(), { sessionId: "sess-42" }),
+          { userId: "user-7" }
+        ),
+        { tenant: "acme", environment: "prod" }
+      ),
+      ["support", "priority-high"]
+    ),
+    {
+      template: "Answer using docs about {topic}",
+      variables: { topic: "billing" },
+      version: "v3",
+    }
+  ),
+  { "app.request_id": "req-123" }
+);
+
+context.with(enrichedContext, async () => {
+  // All spans here include propagated attributes
+});
+```
+
+### Context Setter Reference
+
+| Function | Parameters | Description |
+|----------|------------|-------------|
+| `setSession` | `{ sessionId: string }` | Set session ID |
+| `setUser` | `{ userId: string }` | Set user ID |
+| `setMetadata` | `Record<string, unknown>` | Set metadata object |
+| `setTags` | `string[]` | Set tags array |
+| `setPromptTemplate` | `{ template, variables?, version? }` | Set prompt template info |
+| `setAttributes` | `Attributes` | Set arbitrary attributes |
+
+### Retrieving Attributes
+
+```typescript
+import { getAttributesFromContext } from "@arizeai/openinference-core";
+import { context, trace } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("manual-tracer");
+const span = tracer.startSpan("manual-span");
+span.setAttributes(getAttributesFromContext(context.active()));
+span.end();
+```
+
+## Span Wrappers
+
+### withSpan
+
+Wrap a function to automatically create spans:
+
+```typescript
+import { OpenInferenceSpanKind } from "@arizeai/openinference-semantic-conventions";
+import { withSpan } from "@arizeai/openinference-core";
+
+const retrieve = withSpan(
+  async (query: string) => {
+    return [`Document for ${query}`];
+  },
+  {
+    name: "retrieve-documents",
+    kind: OpenInferenceSpanKind.RETRIEVER,
+  }
+);
+
+const docs = await retrieve("openinference");
+```
+
+### withSpan Options
+
+```typescript
+interface WithSpanOptions {
+  name?: string;                          // Span name (defaults to function name)
+  kind?: OpenInferenceSpanKind | SpanKind; // Span kind
+  tracer?: Tracer;                        // Custom tracer
+  processInput?: InputToAttributesFn;     // Custom input processor
+  processOutput?: OutputToAttributesFn;   // Custom output processor
+}
+```
+
+### Custom Input/Output Processing
+
+```typescript
+import {
+  getInputAttributes,
+  getRetrieverAttributes,
+  withSpan,
+} from "@arizeai/openinference-core";
+
+const retriever = withSpan(
+  async (query: string) => [
+    `Doc A for ${query}`,
+    `Doc B for ${query}`,
+  ],
+  {
+    name: "retriever",
+    kind: "RETRIEVER",
+    processInput: (query) => getInputAttributes(query),
+    processOutput: (documents) =>
+      getRetrieverAttributes({
+        documents: documents.map((content, i) => ({
+          id: `doc-${i}`,
+          content,
+        })),
+      }),
+  }
+);
+```
+
+### Convenience Wrappers
+
+These wrappers set the span kind automatically:
+
+```typescript
+import {
+  traceChain,
+  traceAgent,
+  traceTool,
+} from "@arizeai/openinference-core";
+
+const tracedChain = traceChain(
+  async (q: string) => `chain result: ${q}`,
+  { name: "rag-chain" }
+);
+
+const tracedTool = traceTool(
+  async (city: string) => ({ temp: 72, city }),
+  { name: "weather-tool" }
+);
+
+const tracedAgent = traceAgent(
+  async (q: string) => {
+    const toolResult = await tracedTool("seattle");
+    return tracedChain(`${q} (${toolResult.temp}F)`);
+  },
+  { name: "qa-agent" }
+);
+```
+
+## Decorators
+
+The `@observe` decorator traces class methods (requires TypeScript 5+ standard decorators):
+
+```typescript
+import { OpenInferenceSpanKind } from "@arizeai/openinference-semantic-conventions";
+import { observe } from "@arizeai/openinference-core";
+
+class ChatService {
+  @observe({ kind: OpenInferenceSpanKind.CHAIN })
+  async runWorkflow(message: string) {
+    return `processed: ${message}`;
+  }
+
+  @observe({ name: "llm-call", kind: OpenInferenceSpanKind.LLM })
+  async callModel(prompt: string) {
+    return `model output for: ${prompt}`;
+  }
+}
+
+const service = new ChatService();
+await service.runWorkflow("Hello");
+```
+
+### Decorator Options
+
+```typescript
+interface ObserveOptions {
+  name?: string;                          // Span name (defaults to method name)
+  kind?: OpenInferenceSpanKind | SpanKind; // Span kind
+  tracer?: Tracer;                        // Custom tracer
+  processInput?: InputToAttributesFn;     // Custom input processor
+  processOutput?: OutputToAttributesFn;   // Custom output processor
+}
+```
+
+## Attribute Helpers
+
+Generate OpenInference-compliant attributes:
+
+### getLLMAttributes
+
+```typescript
+import { getLLMAttributes } from "@arizeai/openinference-core";
+import { trace } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("llm-service");
+
+tracer.startActiveSpan("llm-inference", (span) => {
+  span.setAttributes(
+    getLLMAttributes({
+      provider: "openai",
+      modelName: "gpt-4o-mini",
+      inputMessages: [
+        { role: "user", content: "What is OpenInference?" },
+      ],
+      outputMessages: [
+        { role: "assistant", content: "OpenInference is..." },
+      ],
+      tokenCount: { prompt: 12, completion: 44, total: 56 },
+      invocationParameters: { temperature: 0.2 },
+    })
+  );
+  span.end();
+});
+```
+
+### getLLMAttributes Parameters
+
+```typescript
+interface LLMAttributesParams {
+  provider?: string;                  // LLM provider (e.g., "openai")
+  modelName?: string;                 // Model name (e.g., "gpt-4o-mini")
+  inputMessages?: Message[];          // Input messages array
+  outputMessages?: Message[];         // Output messages array
+  tokenCount?: TokenCount;            // Token usage
+  tools?: Tool[];                     // Available tools
+  invocationParameters?: Record<string, unknown>; // Model parameters
+}
+
+interface Message {
+  role: string;                       // "user", "assistant", "system"
+  content: string;                    // Message content
+  name?: string;                      // Optional name
+  toolCalls?: ToolCall[];            // Tool calls in message
+}
+
+interface TokenCount {
+  prompt?: number;                    // Prompt tokens
+  completion?: number;                // Completion tokens
+  total?: number;                     // Total tokens
+}
+```
+
+### getEmbeddingAttributes
+
+```typescript
+import { getEmbeddingAttributes } from "@arizeai/openinference-core";
+
+span.setAttributes(
+  getEmbeddingAttributes({
+    modelName: "text-embedding-3-small",
+    embeddings: [
+      { text: "First text", vector: [0.1, 0.2, 0.3] },
+      { text: "Second text", vector: [0.4, 0.5, 0.6] },
+    ],
+  })
+);
+```
+
+### getRetrieverAttributes
+
+```typescript
+import { getRetrieverAttributes } from "@arizeai/openinference-core";
+
+span.setAttributes(
+  getRetrieverAttributes({
+    documents: [
+      { id: "doc-1", content: "Document content", score: 0.95 },
+      { id: "doc-2", content: "Another document", score: 0.87 },
+    ],
+  })
+);
+```
+
+### getToolAttributes
+
+```typescript
+import { getToolAttributes } from "@arizeai/openinference-core";
+
+span.setAttributes(
+  getToolAttributes({
+    name: "get_weather",
+    description: "Get current weather for a city",
+    parameters: { city: "Seattle", units: "fahrenheit" },
+  })
+);
+```
+
+### getInputAttributes / getOutputAttributes
+
+```typescript
+import {
+  getInputAttributes,
+  getOutputAttributes,
+} from "@arizeai/openinference-core";
+import { MimeType } from "@arizeai/openinference-semantic-conventions";
+
+// String input
+span.setAttributes(getInputAttributes("What is OpenInference?"));
+
+// Structured input
+span.setAttributes(
+  getInputAttributes({
+    value: JSON.stringify({ query: "search term" }),
+    mimeType: MimeType.JSON,
+  })
+);
+
+// Output
+span.setAttributes(
+  getOutputAttributes("OpenInference is a framework...")
+);
+```
+
+### getMetadataAttributes
+
+```typescript
+import { getMetadataAttributes } from "@arizeai/openinference-core";
+
+span.setAttributes(
+  getMetadataAttributes({
+    tenant: "acme",
+    environment: "production",
+    version: "1.2.3",
+  })
+);
+```
+
+## Utility Functions
+
+### withSafety
+
+Wrap a function and return `null` on error:
+
+```typescript
+import { withSafety } from "@arizeai/openinference-core";
+
+const safeParser = withSafety({
+  fn: (json: string) => JSON.parse(json),
+  onError: (error) => console.error("Parse failed:", error),
+});
+
+const result = safeParser("invalid json"); // Returns null instead of throwing
+```
+
+### safelyJSONStringify / safelyJSONParse
+
+```typescript
+import {
+  safelyJSONStringify,
+  safelyJSONParse,
+} from "@arizeai/openinference-core";
+
+const json = safelyJSONStringify({ key: "value" }); // Returns string or undefined
+const obj = safelyJSONParse(json); // Returns object or undefined
+```
+
+## Complete Example
+
+```typescript
+import { trace, context } from "@opentelemetry/api";
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { ConsoleSpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { OpenInferenceSpanKind } from "@arizeai/openinference-semantic-conventions";
+import {
+  OITracer,
+  setSession,
+  setUser,
+  withSpan,
+  getLLMAttributes,
+} from "@arizeai/openinference-core";
+
+// Setup provider
+const provider = new NodeTracerProvider();
+provider.addSpanProcessor(new SimpleSpanProcessor(new ConsoleSpanExporter()));
+provider.register();
+
+// Create OITracer with data masking
+const oiTracer = new OITracer({
+  tracer: trace.getTracer("my-app"),
+  traceConfig: {
+    hideInputImages: true,
+    base64ImageMaxLength: 8000,
+  },
+});
+
+// Define traced functions
+const callLLM = withSpan(
+  async (prompt: string) => {
+    // Simulate LLM call
+    return `Response to: ${prompt}`;
+  },
+  {
+    name: "llm-call",
+    kind: OpenInferenceSpanKind.LLM,
+    tracer: oiTracer,
+    processOutput: (output) => 
+      getLLMAttributes({
+        modelName: "gpt-4o-mini",
+        outputMessages: [{ role: "assistant", content: output }],
+      }),
+  }
+);
+
+const processRequest = withSpan(
+  async (query: string) => {
+    return callLLM(query);
+  },
+  {
+    name: "process-request",
+    kind: OpenInferenceSpanKind.CHAIN,
+  }
+);
+
+// Execute with context
+const enrichedContext = setUser(
+  setSession(context.active(), { sessionId: "sess-123" }),
+  { userId: "user-456" }
+);
+
+context.with(enrichedContext, async () => {
+  const result = await processRequest("What is OpenInference?");
+  console.log(result);
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Semantic Conventions" icon="book" href="/javascript/semantic-conventions">
+    Learn about OpenInference semantic conventions
+  </Card>
+  <Card title="Instrumentations" icon="plug" href="/javascript/instrumentations">
+    Auto-instrument LLM frameworks
+  </Card>
+  <Card title="Examples" icon="code" href="/examples">
+    View complete examples
+  </Card>
+</CardGroup>

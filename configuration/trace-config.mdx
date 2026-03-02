@@ -1,0 +1,208 @@
+---
+title: TraceConfig
+description: Configure trace behavior using TraceConfig objects across Python, JavaScript, and Java
+---
+
+# TraceConfig
+
+The `TraceConfig` object allows you to configure trace behavior programmatically in your application code. This provides an alternative to setting environment variables and allows for dynamic configuration.
+
+## Overview
+
+TraceConfig helps you modify the observability level of your tracing. You can:
+- Keep sensitive information from being logged for security reasons
+- Limit the size of base64 encoded images to reduce payload size
+- Control which parts of your LLM interactions are traced
+
+## Precedence Order
+
+Configuration values are resolved in the following order:
+1. Values set in the TraceConfig object in code (highest priority)
+2. Environment variables
+3. Default values (lowest priority)
+
+## Python
+
+### Import
+
+```python
+from openinference.instrumentation import TraceConfig
+```
+
+### Usage
+
+Create a `TraceConfig` instance and pass it to your instrumentor's `instrument()` method:
+
+```python
+from openinference.instrumentation import TraceConfig
+from openinference.instrumentation.openai import OpenAIInstrumentor
+
+config = TraceConfig(
+    hide_llm_invocation_parameters=True,
+    hide_inputs=False,
+    hide_outputs=False,
+    hide_input_messages=False,
+    hide_output_messages=False,
+    hide_input_images=True,
+    hide_input_text=False,
+    hide_output_text=False,
+    hide_embeddings_vectors=False,
+    hide_embeddings_text=False,
+    base64_image_max_length=16000,
+    hide_prompts=False,
+    hide_choices=False,
+)
+
+OpenAIInstrumentor().instrument(
+    tracer_provider=tracer_provider,
+    config=config,
+)
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `hide_llm_invocation_parameters` | `bool` | `False` | Hides LLM invocation parameters |
+| `hide_inputs` | `bool` | `False` | Hides input.value and all input messages |
+| `hide_outputs` | `bool` | `False` | Hides output.value and all output messages |
+| `hide_input_messages` | `bool` | `False` | Hides all input messages (independent of HIDE_INPUTS) |
+| `hide_output_messages` | `bool` | `False` | Hides all output messages (independent of HIDE_OUTPUTS) |
+| `hide_input_images` | `bool` | `False` | Hides images from input messages |
+| `hide_input_text` | `bool` | `False` | Hides text from input messages |
+| `hide_output_text` | `bool` | `False` | Hides text from output messages |
+| `hide_embedding_vectors` | `bool` | `False` | **Deprecated:** Use `hide_embeddings_vectors` instead |
+| `hide_embeddings_vectors` | `bool` | `False` | Replaces embedding vectors with `"__REDACTED__"` |
+| `hide_embeddings_text` | `bool` | `False` | Replaces embedding text with `"__REDACTED__"` |
+| `hide_prompts` | `bool` | `False` | Hides LLM prompts (completions API) |
+| `hide_choices` | `bool` | `False` | Hides LLM choices (completions API outputs) |
+| `base64_image_max_length` | `int` | `32000` | Limits characters of a base64 encoding of an image |
+
+### Example: Hiding Sensitive Data
+
+```python
+# Hide all PII but keep structure visible
+config = TraceConfig(
+    hide_input_text=True,
+    hide_output_text=True,
+    hide_embeddings_text=True,
+)
+```
+
+## JavaScript
+
+### Import
+
+```typescript
+import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai"
+```
+
+### Usage
+
+Create a trace config object and pass it to your instrumentation constructor:
+
+```typescript
+import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai"
+
+const traceConfig = {
+  hideInputs: true,
+  hideOutputs: false,
+  hideInputImages: true,
+  base64ImageMaxLength: 16000,
+}
+
+const instrumentation = new OpenAIInstrumentation({ traceConfig })
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `hideInputs` | `boolean` | `false` | Hides input.value and all input messages |
+| `hideOutputs` | `boolean` | `false` | Hides output.value and all output messages |
+| `hideInputMessages` | `boolean` | `false` | Hides all input messages |
+| `hideOutputMessages` | `boolean` | `false` | Hides all output messages |
+| `hideInputImages` | `boolean` | `false` | Hides images from input messages |
+| `hideInputText` | `boolean` | `false` | Hides text from input messages |
+| `hideOutputText` | `boolean` | `false` | Hides text from output messages |
+| `hideEmbeddingVectors` | `boolean` | `false` | Replaces embedding vectors with `"__REDACTED__"` |
+| `hidePrompts` | `boolean` | `false` | Hides LLM prompts |
+| `base64ImageMaxLength` | `number` | `32000` | Limits characters of a base64 encoding of an image |
+
+### Example: Partial Configuration
+
+```typescript
+// Only specify what you want to override
+// Everything else falls back to environment variables, then defaults
+const traceConfig = { hideInputs: true }
+
+const instrumentation = new OpenAIInstrumentation({ traceConfig })
+```
+
+## Java
+
+### Import
+
+```java
+import com.arize.instrumentation.TraceConfig;
+```
+
+### Usage
+
+Use the builder pattern to create a `TraceConfig` instance:
+
+```java
+import com.arize.instrumentation.TraceConfig;
+
+TraceConfig config = TraceConfig.builder()
+    .hideInputs(true)
+    .hideOutputs(false)
+    .hideInputImages(true)
+    .hideInputText(false)
+    .hideOutputText(false)
+    .hideInputEmbeddings(false)
+    .hideOutputEmbeddings(false)
+    .hidePromptTemplate(false)
+    .hidePromptTemplateVariables(false)
+    .hideToolParameters(false)
+    .base64ImageMaxLength("16000")
+    .build();
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `hideInputs` | `boolean` | `false` | Hides input values |
+| `hideOutputs` | `boolean` | `false` | Hides output values |
+| `hideInputMessages` | `boolean` | `false` | Hides all input messages |
+| `hideOutputMessages` | `boolean` | `false` | Hides all output messages |
+| `hideInputImages` | `boolean` | `false` | Hides images from input messages |
+| `hideOutputImages` | `boolean` | `false` | Hides images from output messages |
+| `hideInputText` | `boolean` | `false` | Hides text from input messages |
+| `hideOutputText` | `boolean` | `false` | Hides text from output messages |
+| `hideInputAudio` | `boolean` | `false` | Hides audio from input messages |
+| `hideOutputAudio` | `boolean` | `false` | Hides audio from output messages |
+| `hideInputEmbeddings` | `boolean` | `false` | Hides input embeddings |
+| `hideOutputEmbeddings` | `boolean` | `false` | Hides output embeddings |
+| `hidePromptTemplate` | `boolean` | `false` | Hides prompt templates |
+| `hidePromptTemplateVariables` | `boolean` | `false` | Hides prompt template variables |
+| `hidePromptTemplateVersion` | `boolean` | `false` | Hides prompt template version |
+| `hideToolParameters` | `boolean` | `false` | Hides tool parameters |
+| `base64ImageMaxLength` | `String` | `"unlimited"` | Limits characters of a base64 encoding of an image |
+
+### Example: Default Configuration
+
+```java
+// Use all defaults
+TraceConfig config = TraceConfig.getDefault();
+```
+
+## Redacted Content
+
+When content is hidden due to privacy configuration settings, the value `"__REDACTED__"` is used as a placeholder across all languages. This constant value allows consumers of the trace data to identify that content was intentionally hidden rather than missing or empty.
+
+## Next Steps
+
+- See [Environment Variables](/configuration/environment-variables) for alternative configuration methods
+- See [Privacy Controls](/configuration/privacy-controls) for comprehensive privacy scenarios

@@ -1,0 +1,199 @@
+---
+title: LlamaIndex Query Engine
+description: Build a query engine with LlamaIndex and OpenInference instrumentation
+---
+
+This example demonstrates how to create and instrument a LlamaIndex query engine with OpenInference tracing.
+
+## Prerequisites
+
+- Python 3.9+
+- OpenAI API key
+- Phoenix or another OpenTelemetry collector
+
+## Installation
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    pip install llama-index llama-index-core llama-index-llms-openai \
+      openinference-instrumentation-llama-index \
+      opentelemetry-sdk \
+      opentelemetry-exporter-otlp
+    ```
+  </Step>
+
+  <Step title="Set environment variables">
+    ```bash
+    export OPENAI_API_KEY="your-api-key"
+    export COLLECTOR_ENDPOINT="http://localhost:6006/v1/traces"
+    ```
+  </Step>
+</Steps>
+
+## Instrumentation Setup
+
+First, create an instrumentation module:
+
+```python
+import os
+
+from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
+from openinference.semconv.resource import ResourceAttributes
+from opentelemetry import trace as trace_api
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+
+def instrument():
+    collector_endpoint = os.getenv("COLLECTOR_ENDPOINT")
+    resource = Resource(attributes={ResourceAttributes.PROJECT_NAME: "llama-index-chat"})
+    tracer_provider = trace_sdk.TracerProvider(resource=resource)
+    span_exporter = OTLPSpanExporter(endpoint=collector_endpoint)
+    span_processor = SimpleSpanProcessor(span_exporter=span_exporter)
+    tracer_provider.add_span_processor(span_processor=span_processor)
+    trace_api.set_tracer_provider(tracer_provider=tracer_provider)
+    LlamaIndexInstrumentor().instrument()
+    print("🔭 OpenInference instrumentation enabled.")
+```
+
+## Complete Query Engine Example
+
+```python
+import os
+from dotenv import load_dotenv
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
+from llama_index.llms.openai import OpenAI
+from llama_index.embeddings.openai import OpenAIEmbedding
+
+# Load environment and instrument
+load_dotenv()
+from instrument import instrument
+instrument()
+
+# Configure LLM and embeddings
+Settings.llm = OpenAI(model="gpt-3.5-turbo", temperature=0.1)
+Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
+
+# Load documents
+documents = SimpleDirectoryReader("./data").load_data()
+
+# Create index
+index = VectorStoreIndex.from_documents(documents)
+
+# Create query engine
+query_engine = index.as_query_engine(similarity_top_k=3)
+
+# Query the engine
+response = query_engine.query("What is the main topic of these documents?")
+print(response)
+```
+
+## Chat Engine Example
+
+LlamaIndex also provides chat engines for conversational applications:
+
+```python
+from llama_index.core.memory import ChatMemoryBuffer
+
+# Create chat engine with memory
+memory = ChatMemoryBuffer.from_defaults(token_limit=3000)
+chat_engine = index.as_chat_engine(
+    chat_mode="context",
+    memory=memory,
+    system_prompt=(
+        "You are a helpful assistant with access to a knowledge base. "
+        "Always ground your answers in the provided context."
+    ),
+)
+
+# Have a conversation
+response1 = chat_engine.chat("Tell me about the key concepts.")
+print(response1)
+
+response2 = chat_engine.chat("Can you elaborate on the first point?")
+print(response2)
+```
+
+## Streaming Responses
+
+```python
+# Create streaming query engine
+query_engine = index.as_query_engine(streaming=True)
+
+# Stream the response
+streaming_response = query_engine.query("Explain the main ideas.")
+for text in streaming_response.response_gen:
+    print(text, end="", flush=True)
+print()
+```
+
+## Key Features
+
+### Automatic Tracing
+
+LlamaIndex instrumentation captures:
+- **Query execution**: Full query pipeline from input to output
+- **Retrieval**: Document retrieval with similarity scores
+- **LLM calls**: All calls to language models
+- **Embeddings**: Embedding generation for queries and documents
+- **Node processing**: Document chunking and indexing
+
+### Resource Attributes
+
+Use resource attributes to organize projects:
+```python
+resource = Resource(attributes={
+    ResourceAttributes.PROJECT_NAME: "my-app",
+})
+```
+
+### Memory and Context
+
+The instrumentation tracks:
+- Conversation history in chat engines
+- Context window management
+- Memory buffer operations
+
+## Production Setup
+
+For production deployments:
+
+```python
+import uvicorn
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+
+from instrument import instrument
+
+# Initialize instrumentation before app creation
+instrument()
+
+app = FastAPI(title="LlamaIndex API")
+
+@app.post("/query")
+async def query_endpoint(question: str):
+    response = query_engine.query(question)
+    return {"answer": str(response)}
+
+@app.post("/chat/stream")
+async def chat_stream_endpoint(message: str):
+    streaming_response = chat_engine.stream_chat(message)
+    
+    async def generate():
+        for token in streaming_response.response_gen:
+            yield token
+    
+    return StreamingResponse(generate(), media_type="text/plain")
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+```
+
+## Next Steps
+
+- Learn about [agent patterns](/examples/python/llama-index-agents)
+- Explore [custom retrievers](/examples/python/llama-index-retrievers)
+- See [production deployment](/examples/python/llama-index-production)

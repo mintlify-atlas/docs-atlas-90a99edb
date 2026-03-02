@@ -1,0 +1,168 @@
+---
+title: "Installation"
+description: "Install OpenInference JavaScript packages for tracing LLM applications"
+---
+
+## Requirements
+
+OpenInference JavaScript requires:
+- Node.js 10 or higher
+- npm, yarn, or pnpm package manager
+
+## Installation
+
+### Core Dependencies
+
+First, install the OpenTelemetry SDK packages:
+
+<CodeGroup>
+```bash npm
+npm install --save @opentelemetry/exporter-trace-otlp-http \
+  @opentelemetry/exporter-trace-otlp-proto \
+  @opentelemetry/resources \
+  @opentelemetry/sdk-trace-node \
+  @opentelemetry/instrumentation
+```
+
+```bash yarn
+yarn add @opentelemetry/exporter-trace-otlp-http \
+  @opentelemetry/exporter-trace-otlp-proto \
+  @opentelemetry/resources \
+  @opentelemetry/sdk-trace-node \
+  @opentelemetry/instrumentation
+```
+
+```bash pnpm
+pnpm add @opentelemetry/exporter-trace-otlp-http \
+  @opentelemetry/exporter-trace-otlp-proto \
+  @opentelemetry/resources \
+  @opentelemetry/sdk-trace-node \
+  @opentelemetry/instrumentation
+```
+</CodeGroup>
+
+### Instrumentation Packages
+
+Install the instrumentation for your LLM framework:
+
+<CodeGroup>
+```bash npm
+# OpenAI
+npm install --save @arizeai/openinference-instrumentation-openai
+
+# LangChain
+npm install --save @arizeai/openinference-instrumentation-langchain
+
+# Anthropic
+npm install --save @arizeai/openinference-instrumentation-anthropic
+
+# AWS Bedrock
+npm install --save @arizeai/openinference-instrumentation-bedrock
+```
+
+```bash yarn
+# OpenAI
+yarn add @arizeai/openinference-instrumentation-openai
+
+# LangChain
+yarn add @arizeai/openinference-instrumentation-langchain
+
+# Anthropic
+yarn add @arizeai/openinference-instrumentation-anthropic
+
+# AWS Bedrock
+yarn add @arizeai/openinference-instrumentation-bedrock
+```
+
+```bash pnpm
+# OpenAI
+pnpm add @arizeai/openinference-instrumentation-openai
+
+# LangChain
+pnpm add @arizeai/openinference-instrumentation-langchain
+
+# Anthropic
+pnpm add @arizeai/openinference-instrumentation-anthropic
+
+# AWS Bedrock
+pnpm add @arizeai/openinference-instrumentation-bedrock
+```
+</CodeGroup>
+
+### Manual Instrumentation
+
+For manual instrumentation, install the semantic conventions package:
+
+<CodeGroup>
+```bash npm
+npm install --save @arizeai/openinference-semantic-conventions
+```
+
+```bash yarn
+yarn add @arizeai/openinference-semantic-conventions
+```
+
+```bash pnpm
+pnpm add @arizeai/openinference-semantic-conventions
+```
+</CodeGroup>
+
+### Core Utilities (Optional)
+
+For advanced tracing features like context propagation and span wrappers:
+
+<CodeGroup>
+```bash npm
+npm install --save @arizeai/openinference-core
+```
+
+```bash yarn
+yarn add @arizeai/openinference-core
+```
+
+```bash pnpm
+pnpm add @arizeai/openinference-core
+```
+</CodeGroup>
+
+## Basic Setup
+
+Create an instrumentation file to configure OpenTelemetry:
+
+```typescript instrumentation.ts
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai";
+
+const provider = new NodeTracerProvider();
+provider.register();
+
+registerInstrumentations({
+  instrumentations: [new OpenAIInstrumentation()],
+});
+```
+
+<Warning>
+The instrumentation must run **before** any other code in your application. Load it using the `-r` flag:
+
+```bash
+node -r ./instrumentation.js ./app.js
+```
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Core Package" icon="cube" href="/javascript/core">
+    Learn about OITracer, context attributes, and span wrappers
+  </Card>
+  <Card title="Semantic Conventions" icon="book" href="/javascript/semantic-conventions">
+    Explore OpenInference semantic conventions for JavaScript
+  </Card>
+  <Card title="Instrumentations" icon="plug" href="/javascript/instrumentations">
+    View all available instrumentation packages
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Follow the quickstart guide
+  </Card>
+</CardGroup>
